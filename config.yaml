@@ -1,0 +1,48 @@
+# Configurazione RAG Gestionale
+# File alternativo per configurazioni complesse
+
+# Domini autorizzati per crawling
+allowed_domains:
+  - cassiopea.centrosistemi.it
+  - docs.centrosistemi.it
+  - wiki.centrosistemi.it
+  - docs.example.com
+
+# Moduli disponibili
+modules:
+  - Contabilità
+  - Fatturazione
+  - Magazzino
+  - HR
+  - Desktop Teseo7
+  - Desktop Teseo6
+
+# Configurazione chunking per tipo di contenuto
+chunking_profiles:
+  default:
+    max_tokens: 800
+    overlap: 100
+
+  procedure:
+    max_tokens: 350
+    overlap: 50
+
+  parameter:
+    max_tokens: 200
+    overlap: 0
+
+  table:
+    max_rows: 25
+
+# Sinonimi italiani per ricerca
+italian_synonyms:
+  - group: [impostazione, impostaz, settaggio, configurazione, config]
+  - group: [parametro, parametr, opzione, campo]
+  - group: [procedura, processo, guida, istruzione]
+  - group: [errore, error, codice, avviso, warning]
+  - group: [fattura, fatturazione, documento]
+  - group: [cliente, anagrafica, soggetto]
+  - group: [articolo, prodotto, merce]
+  - group: [iva, imposta, aliquota]
+  - group: [contabilita, contabilità, coge]
+  - group: [magazzino, giacenza, stock]

@@ -1,0 +1,67 @@
+version: '3.8'
+
+services:
+  # Qdrant Vector Database
+  qdrant:
+    image: qdrant/qdrant:v1.7.0
+    ports:
+      - "6333:6333"
+      - "6334:6334"
+    volumes:
+      - qdrant_data:/qdrant/storage
+    environment:
+      - QDRANT__SERVICE__HTTP_PORT=6333
+      - QDRANT__SERVICE__GRPC_PORT=6334
+    restart: unless-stopped
+
+  # OpenSearch for lexical search
+  opensearch:
+    image: opensearchproject/opensearch:2.11.0
+    ports:
+      - "9200:9200"
+      - "9600:9600"
+    environment:
+      - discovery.type=single-node
+      - OPENSEARCH_INITIAL_ADMIN_PASSWORD=admin123!
+      - "OPENSEARCH_JAVA_OPTS=-Xms512m -Xmx512m"
+      - bootstrap.memory_lock=true
+      - plugins.security.disabled=true
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    volumes:
+      - opensearch_data:/usr/share/opensearch/data
+    restart: unless-stopped
+
+  # Redis for caching (optional)
+  redis:
+    image: redis:7.2-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+
+  # RAG API (uncomment when ready)
+  # rag-api:
+  #   build:
+  #     context: .
+  #     dockerfile: Dockerfile
+  #   ports:
+  #     - "8000:8000"
+  #   environment:
+  #     - RAG_VECTOR_STORE__HOST=qdrant
+  #     - RAG_LEXICAL_SEARCH__HOST=opensearch
+  #     - RAG_REDIS_URL=redis://redis:6379
+  #   depends_on:
+  #     - qdrant
+  #     - opensearch
+  #     - redis
+  #   restart: unless-stopped
+
+volumes:
+  qdrant_data:
+  opensearch_data:
+  redis_data:
