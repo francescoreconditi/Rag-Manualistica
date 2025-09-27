@@ -106,7 +106,6 @@ celerybeat.pid
 
 # Environments
 .env
-.env.*
 .venv
 env/
 venv/
@@ -231,7 +230,6 @@ test_reports/
 
 # UV package manager
 .uv/
-uv.lock
 
 # Ruff
 .ruff_cache/
