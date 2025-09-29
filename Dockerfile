@@ -13,19 +13,21 @@ RUN pip install uv
 # Set working directory
 WORKDIR /app
 
+# Create non-root user and change ownership
+RUN useradd --create-home --shell /bin/bash app && \
+    chown -R app:app /app
+USER app
+
 # Copy project files
 COPY pyproject.toml ./
 COPY src/ ./src/
+COPY .env ./
 
-# Install dependencies
-RUN uv pip install --system -e .
-
-# Create non-root user
-RUN useradd --create-home --shell /bin/bash app
-USER app
+# Install dependencies globally (no venv)
+RUN uv sync --all-extras
 
 # Expose port
 EXPOSE 8000
 
 # Command to run the application
-CMD ["python", "-m", "src.rag_gestionale.api.main"]
+CMD ["uv", "run", "python", "-m", "src.rag_gestionale.api.main"]

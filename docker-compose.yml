@@ -1,4 +1,4 @@
-version: '3.8'
+version: "3.8"
 
 services:
   # Qdrant Vector Database
@@ -44,22 +44,21 @@ services:
     restart: unless-stopped
     command: redis-server --appendonly yes
 
-  # RAG API (uncomment when ready)
-  # rag-api:
-  #   build:
-  #     context: .
-  #     dockerfile: Dockerfile
-  #   ports:
-  #     - "8000:8000"
-  #   environment:
-  #     - RAG_VECTOR_STORE__HOST=qdrant
-  #     - RAG_LEXICAL_SEARCH__HOST=opensearch
-  #     - RAG_REDIS_URL=redis://redis:6379
-  #   depends_on:
-  #     - qdrant
-  #     - opensearch
-  #     - redis
-  #   restart: unless-stopped
+  rag-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - RAG_VECTOR_STORE__HOST=qdrant
+      - RAG_LEXICAL_SEARCH__HOST=opensearch
+      - RAG_REDIS_URL=redis://redis:6379
+    depends_on:
+      - qdrant
+      - opensearch
+      - redis
+    restart: unless-stopped
 
 volumes:
   qdrant_data:
