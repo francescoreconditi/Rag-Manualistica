@@ -319,7 +319,11 @@ class LexicalSearch:
     async def get_index_stats(self) -> Dict[str, Any]:
         """Statistiche dell'indice"""
         try:
-            stats = await self.client.indices.stats(index=self.index_name)
+            # Aggiungo timeout specifico per evitare blocchi
+            stats = await self.client.indices.stats(
+                index=self.index_name,
+                request_timeout=5,  # 5 secondi di timeout
+            )
             index_stats = stats["indices"][self.index_name]
 
             return {
@@ -329,7 +333,13 @@ class LexicalSearch:
             }
         except Exception as e:
             logger.error(f"Errore recupero statistiche: {e}")
-            return {}
+            # Ritorno valori di default invece di dizionario vuoto
+            return {
+                "document_count": 0,
+                "store_size": 0,
+                "index_health": "unknown",
+                "error": str(e),
+            }
 
     def _chunk_to_document(self, chunk: DocumentChunk) -> Dict[str, Any]:
         """Converte chunk in documento OpenSearch"""
