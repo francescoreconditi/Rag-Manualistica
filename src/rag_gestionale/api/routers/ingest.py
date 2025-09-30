@@ -6,6 +6,7 @@ import time
 from typing import List, Optional
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
+from loguru import logger
 from pydantic import BaseModel, Field
 
 from ..dependencies import get_components, RAGComponents
@@ -56,31 +57,53 @@ async def ingest_documents(
         chunks_processed = 0
 
         if request.urls:
+            logger.info(f"Inizio ingestione da {len(request.urls)} URL")
             chunks = await components.ingestion_coordinator.ingest_from_urls(
                 request.urls
             )
+            logger.info(
+                f"Ingestione URLs completata, ottenuti {len(chunks) if chunks else 0} chunk"
+            )
+
             if chunks:
+                logger.info(f"Inizio indicizzazione di {len(chunks)} chunk")
                 await components.retriever.add_chunks(chunks)
+                logger.info(f"Indicizzazione completata")
                 chunks_processed += len(chunks)
 
         if request.directory:
+            logger.info(f"Inizio ingestione da directory: {request.directory}")
             chunks = await components.ingestion_coordinator.ingest_from_directory(
                 request.directory
             )
+            logger.info(
+                f"Ingestione directory completata, ottenuti {len(chunks) if chunks else 0} chunk"
+            )
+
             if chunks:
+                logger.info(f"Inizio indicizzazione di {len(chunks)} chunk")
                 await components.retriever.add_chunks(chunks)
+                logger.info(f"Indicizzazione completata")
                 chunks_processed += len(chunks)
 
         processing_time_ms = int((time.time() - start_time) * 1000)
 
-        return IngestResponse(
+        logger.info(
+            f"Preparazione risposta HTTP: {chunks_processed} chunk, {processing_time_ms}ms"
+        )
+
+        response = IngestResponse(
             status="success",
             message=f"Ingestione completata con successo",
             chunks_processed=chunks_processed,
             processing_time_ms=processing_time_ms,
         )
 
+        logger.info(f"Risposta creata, invio al client")
+        return response
+
     except Exception as e:
+        logger.error(f"Errore durante ingestione: {str(e)}")
         raise HTTPException(
             status_code=500, detail=f"Errore durante l'ingestione: {str(e)}"
         )
