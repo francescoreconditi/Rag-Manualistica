@@ -1,0 +1,189 @@
+<section class="search">
+  <div class="search__layout">
+    <mat-card class="search__card">
+      <mat-card-header>
+        <mat-card-title>Ricerca documentazione</mat-card-title>
+        <mat-card-subtitle>Interroga il knowledge base dei manuali gestionali.</mat-card-subtitle>
+      </mat-card-header>
+
+      <mat-card-content>
+        <form class="search__form" [formGroup]="searchForm" (ngSubmit)="onSubmit()">
+          <mat-form-field appearance="outline" class="search__field">
+            <mat-label>Domanda</mat-label>
+            <textarea
+              matInput
+              formControlName="query"
+              rows="3"
+              placeholder="Come imposto l'aliquota IVA predefinita?"
+            ></textarea>
+            <mat-icon matSuffix>help_outline</mat-icon>
+            <mat-hint>Minimo 3 caratteri</mat-hint>
+            <mat-error *ngIf="searchForm.controls.query.hasError('required')">
+              Inserisci una domanda
+            </mat-error>
+          </mat-form-field>
+
+          <div class="search__filters">
+            <mat-form-field appearance="outline">
+              <mat-label>Modulo</mat-label>
+              <mat-select formControlName="module">
+                <mat-option *ngFor="let module of modules" [value]="module">{{ module }}</mat-option>
+              </mat-select>
+            </mat-form-field>
+
+            <mat-form-field appearance="outline">
+              <mat-label>Tipo contenuto</mat-label>
+              <mat-select formControlName="contentType">
+                <mat-option *ngFor="let type of contentTypes" [value]="type">{{ type }}</mat-option>
+              </mat-select>
+            </mat-form-field>
+
+            <mat-form-field appearance="outline">
+              <mat-label>Risultati (top_k)</mat-label>
+              <input matInput type="number" formControlName="topK" min="1" max="20" />
+            </mat-form-field>
+          </div>
+
+          <mat-slide-toggle formControlName="includeSources">
+            Includi fonti nella risposta
+          </mat-slide-toggle>
+
+          <mat-divider></mat-divider>
+
+          <div class="search__llm" [class.search__llm--disabled]="!llmConfigured">
+            <div class="search__llm-header">
+              <mat-icon>auto_awesome</mat-icon>
+              <div>
+                <h3>LLM (OpenAI)</h3>
+                <p>
+                  {{ llmConfigured ? 'LLM configurato dal backend' : 'Configura una chiave per attivare la generazione via LLM' }}
+                </p>
+              </div>
+            </div>
+
+            <mat-slide-toggle formControlName="llmEnabled">
+              Abilita generazione via LLM
+            </mat-slide-toggle>
+
+            <div class="search__llm-grid" *ngIf="searchForm.value.llmEnabled">
+              <mat-form-field appearance="outline">
+                <mat-label>Modalità generazione</mat-label>
+                <mat-select formControlName="generationMode">
+                  <mat-option *ngFor="let mode of generationModes" [value]="mode">
+                    {{ mode }}
+                  </mat-option>
+                </mat-select>
+              </mat-form-field>
+
+              <mat-form-field appearance="outline">
+                <mat-label>OpenAI API Key (opzionale)</mat-label>
+                <input matInput type="password" formControlName="apiKey" placeholder="sk-..." />
+                <mat-hint>Se configurata lato server non è necessario inserirla.</mat-hint>
+              </mat-form-field>
+            </div>
+          </div>
+
+          <div class="search__actions">
+            <button
+              mat-flat-button
+              color="primary"
+              type="submit"
+              [disabled]="searchForm.invalid || isSearching()"
+            >
+              <mat-icon>search</mat-icon>
+              Cerca ora
+            </button>
+          </div>
+        </form>
+      </mat-card-content>
+
+      <mat-progress-bar *ngIf="isSearching()" mode="indeterminate"></mat-progress-bar>
+    </mat-card>
+
+    <div class="search__status">
+      <mat-card>
+        <mat-card-header>
+          <mat-card-title>Stato Sistema</mat-card-title>
+          <mat-card-subtitle *ngIf="health() as state">
+            {{ state.status | uppercase }} · v{{ state.version }}
+          </mat-card-subtitle>
+        </mat-card-header>
+
+        <mat-card-content *ngIf="health() as state; else noHealth">
+          <div class="search__status-grid">
+            <app-metric-card
+              label="Documenti indicizzati"
+              [value]="state.stats.retrieval?.vector_store?.total_points ?? 0"
+              icon="library_books"
+              helper="Vector store"
+            ></app-metric-card>
+
+            <app-metric-card
+              label="Servizi attivi"
+              [value]="(state.services | keyvalue).length"
+              icon="hub"
+              helper="Componenti monitorati"
+            ></app-metric-card>
+          </div>
+
+          <mat-divider></mat-divider>
+
+          <ul class="search__services">
+            <li *ngFor="let service of state.services | keyvalue">
+              <mat-icon [class.search__service-ok]="service.value === 'healthy' || service.value === 'enabled'">
+                {{ service.value === 'healthy' || service.value === 'enabled' ? 'check_circle' : 'error' }}
+              </mat-icon>
+              <span>{{ service.key }}</span>
+              <span class="search__service-status">{{ service.value }}</span>
+            </li>
+          </ul>
+        </mat-card-content>
+
+        <ng-template #noHealth>
+          <mat-card-content>
+            <p>Impossibile contattare il backend. Verifica che il server FastAPI sia attivo.</p>
+          </mat-card-content>
+        </ng-template>
+      </mat-card>
+
+      <mat-card *ngIf="searchHistory().length" class="search__history">
+        <mat-card-header>
+          <mat-card-title>Ricerche recenti</mat-card-title>
+        </mat-card-header>
+        <mat-card-content>
+          <ul>
+            <li *ngFor="let entry of searchHistory() | slice:0:5">
+              <mat-icon>history</mat-icon>
+              <div>
+                <p>{{ entry.query }}</p>
+                <span>{{ entry.timestamp | date: 'HH:mm:ss' }} · confidenza {{ entry.confidence | percent:'1.0-0' }}</span>
+              </div>
+            </li>
+          </ul>
+        </mat-card-content>
+      </mat-card>
+    </div>
+  </div>
+
+  <mat-card *ngIf="lastSearchResult() as result" class="search__result">
+    <mat-card-header>
+      <mat-card-title>Risposta</mat-card-title>
+      <mat-card-subtitle>
+        Tipo: {{ result.query_type }} · Confidenza: {{ result.confidence | percent:'1.0-0' }}
+        <span *ngIf="searchDurationMs() as duration"> · Tempo: {{ duration / 1000 | number:'1.2-2' }}s</span>
+      </mat-card-subtitle>
+    </mat-card-header>
+
+    <mat-card-content>
+      <div class="search__answer" [innerHTML]="result.answer"></div>
+
+      <mat-divider></mat-divider>
+
+      <section>
+        <h3>Fonti</h3>
+        <app-source-list [sources]="result.sources"></app-source-list>
+      </section>
+    </mat-card-content>
+  </mat-card>
+</section>
+

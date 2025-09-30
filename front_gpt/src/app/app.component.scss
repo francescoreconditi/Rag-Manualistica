@@ -1,0 +1,110 @@
+:host {
+  display: block;
+  height: 100%;
+}
+
+.layout {
+  height: 100vh;
+  background: var(--surface, #f5f7fb);
+
+  &__sidenav {
+    width: 280px;
+    border-right: 1px solid rgba(0, 0, 0, 0.06);
+    padding: 0 0.75rem 1.5rem;
+    background: #ffffff;
+
+    @media (max-width: 960px) {
+      width: 240px;
+    }
+  }
+
+  &__content {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+  }
+
+  &__main {
+    flex: 1;
+    padding: 1.5rem;
+    overflow: auto;
+    background: linear-gradient(180deg, #f6f8ff 0%, #ffffff 40%);
+  }
+}
+
+.sidenav {
+  &__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 1.5rem 0 1rem;
+  }
+
+  &__branding {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+
+  &__titles {
+    display: flex;
+    flex-direction: column;
+    line-height: 1.2;
+  }
+
+  &__title {
+    font-size: 1rem;
+    font-weight: 600;
+    color: #1a237e;
+  }
+
+  &__subtitle {
+    font-size: 0.75rem;
+    color: rgba(0, 0, 0, 0.54);
+  }
+
+  &__toggle {
+    margin-left: auto;
+  }
+
+  &__item--active {
+    border-radius: 12px;
+    background: linear-gradient(135deg, rgba(63, 81, 181, 0.15), rgba(63, 81, 181, 0.08));
+
+    mat-icon {
+      color: #3f51b5;
+    }
+
+    span[matListItemTitle] {
+      color: #1a237e;
+    }
+  }
+
+  &__settings {
+    margin-top: auto;
+    padding-top: 1.5rem;
+  }
+}
+
+.toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 4;
+  backdrop-filter: blur(10px);
+  background: linear-gradient(90deg, #3949ab 0%, #1a237e 100%);
+  color: #ffffff;
+
+  &__menu {
+    margin-right: 1rem;
+  }
+
+  &__title {
+    font-weight: 600;
+    letter-spacing: 0.02em;
+  }
+}
+
+.spacer {
+  flex: 1 1 auto;
+}

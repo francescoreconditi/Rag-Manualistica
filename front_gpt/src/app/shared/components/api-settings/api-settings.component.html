@@ -1,0 +1,55 @@
+<ng-container [ngSwitch]="appearance">
+  <form
+    *ngSwitchCase="'panel'"
+    class="api-settings api-settings--panel"
+    [formGroup]="form"
+    (ngSubmit)="submit()"
+  >
+    <h3>Endpoint API</h3>
+    <p class="api-settings__helper">Configura l\'indirizzo del backend FastAPI.</p>
+
+    <mat-form-field appearance="outline" class="api-settings__field">
+      <mat-label>Base URL</mat-label>
+      <input matInput formControlName="apiBaseUrl" placeholder="http://localhost:8000" />
+      <mat-icon matSuffix>link</mat-icon>
+      <mat-error *ngIf="form.controls.apiBaseUrl.hasError('required')">Campo obbligatorio</mat-error>
+      <mat-error *ngIf="form.controls.apiBaseUrl.hasError('pattern')">Inserisci un URL valido</mat-error>
+    </mat-form-field>
+
+    <button mat-flat-button color="primary" type="submit" class="api-settings__action">
+      Salva API URL
+    </button>
+  </form>
+
+  <div *ngSwitchCase="'toolbar'" class="api-settings api-settings--toolbar">
+    <button
+      mat-icon-button
+      type="button"
+      matTooltip="Configura endpoint API"
+      [matMenuTriggerFor]="apiMenu"
+    >
+      <mat-icon>settings_ethernet</mat-icon>
+    </button>
+
+    <mat-menu #apiMenu="matMenu" class="api-settings__menu">
+      <form class="api-settings__menu-form" [formGroup]="form" (ngSubmit)="submit()">
+        <div class="api-settings__menu-header">
+          <mat-icon color="primary">settings_ethernet</mat-icon>
+          <span>Endpoint API</span>
+        </div>
+
+        <mat-form-field appearance="outline" class="api-settings__field">
+          <mat-label>Base URL</mat-label>
+          <input matInput formControlName="apiBaseUrl" placeholder="http://localhost:8000" />
+          <mat-icon matSuffix>link</mat-icon>
+          <mat-error *ngIf="form.controls.apiBaseUrl.hasError('required')">Campo obbligatorio</mat-error>
+          <mat-error *ngIf="form.controls.apiBaseUrl.hasError('pattern')">Inserisci un URL valido</mat-error>
+        </mat-form-field>
+
+        <button mat-flat-button color="primary" type="submit" [disabled]="form.invalid">
+          Salva
+        </button>
+      </form>
+    </mat-menu>
+  </div>
+</ng-container>

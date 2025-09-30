@@ -1,0 +1,103 @@
+<section class="ingest">
+  <div class="ingest__layout">
+    <mat-card class="ingest__card">
+      <mat-card-header>
+        <mat-card-title>Ingestione documenti</mat-card-title>
+        <mat-card-subtitle>Aggiungi nuovi manuali o pagine di documentazione al sistema.</mat-card-subtitle>
+      </mat-card-header>
+
+      <mat-card-content>
+        <form class="ingest__form" [formGroup]="ingestForm" (ngSubmit)="ingest()">
+          <mat-form-field appearance="outline" class="ingest__field">
+            <mat-label>URL da indicizzare</mat-label>
+            <textarea
+              matInput
+              formControlName="urls"
+              rows="10"
+              placeholder="https://cassiopea.centrosistemi.it/..."
+            ></textarea>
+            <mat-hint>Uno per riga · {{ parsedUrls.length }} URL</mat-hint>
+            <mat-error *ngIf="ingestForm.controls.urls.hasError('required')">
+              Inserisci almeno un URL
+            </mat-error>
+          </mat-form-field>
+
+          <div class="ingest__actions">
+            <button mat-stroked-button type="button" (click)="ingestForm.reset()" [disabled]="isIngesting()">
+              <mat-icon>clear</mat-icon>
+              Pulisci
+            </button>
+
+            <button
+              mat-flat-button
+              color="primary"
+              type="submit"
+              [disabled]="ingestForm.invalid || isIngesting()"
+              matTooltip="Avvia ingestione e indicizzazione"
+            >
+              <mat-icon>cloud_upload</mat-icon>
+              Avvia ingestione
+            </button>
+          </div>
+        </form>
+      </mat-card-content>
+
+      <mat-progress-bar *ngIf="isIngesting()" mode="indeterminate"></mat-progress-bar>
+    </mat-card>
+
+    <div class="ingest__sidebar">
+      <mat-card>
+        <mat-card-header>
+          <mat-card-title>Statistiche</mat-card-title>
+        </mat-card-header>
+        <mat-card-content>
+          <div class="ingest__metrics">
+            <app-metric-card
+              label="URL totali"
+              [value]="totalIngested()"
+              icon="link"
+              helper="Memorizzati localmente"
+            ></app-metric-card>
+
+            <ng-container *ngIf="ingestOutcome() as outcome">
+              <app-metric-card
+                label="Chunk creati"
+                [value]="outcome.chunks"
+                icon="auto_awesome"
+                helper="Ultima ingestione"
+              ></app-metric-card>
+              <app-metric-card
+                label="Tempo"
+                [value]="(outcome.timeMs / 1000).toFixed(2)"
+                icon="timer"
+                helper="Secondi"
+              ></app-metric-card>
+            </ng-container>
+          </div>
+        </mat-card-content>
+      </mat-card>
+
+      <mat-card class="ingest__history" *ngIf="ingestedDocuments().length">
+        <mat-card-header>
+          <mat-card-title>Ultimi URL indicizzati</mat-card-title>
+        </mat-card-header>
+        <mat-card-content>
+          <mat-nav-list>
+            <a
+              mat-list-item
+              *ngFor="let document of ingestedDocuments() | slice:0:8"
+              [href]="document.url"
+              target="_blank"
+              rel="noopener"
+            >
+              <mat-icon matListItemIcon>check_circle</mat-icon>
+              <span matListItemTitle>{{ document.url }}</span>
+              <span matListItemLine>{{ document.ingestedAt | date: 'short' }}</span>
+            </a>
+          </mat-nav-list>
+        </mat-card-content>
+      </mat-card>
+    </div>
+  </div>
+</section>
+

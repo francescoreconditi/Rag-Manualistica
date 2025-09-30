@@ -1,0 +1,98 @@
+<section class="analytics">
+  <header class="analytics__header">
+    <div>
+      <h2>Dashboard analitica</h2>
+      <p>Monitoraggio in tempo reale dello stato del sistema RAG.</p>
+    </div>
+    <button mat-stroked-button color="primary" type="button" (click)="refreshStats()" [disabled]="isLoading()">
+      <mat-icon>refresh</mat-icon>
+      Aggiorna dati
+    </button>
+  </header>
+
+  <div class="analytics__metrics" *ngIf="stats() as s">
+    <app-metric-card
+      label="Documenti indicizzati"
+      [value]="s.retrieval?.vector_store?.total_points ?? 0"
+      icon="library_books"
+      helper="Vector store"
+    ></app-metric-card>
+
+    <app-metric-card
+      label="Ricerche registrate"
+      [value]="searchHistory().length"
+      icon="travel_explore"
+      helper="Sessione corrente"
+    ></app-metric-card>
+
+    <app-metric-card
+      label="Confidenza media"
+      [value]="((averageConfidence() * 100) | number: '1.0-1') + '%'"
+      icon="workspace_premium"
+      helper="Risposte"
+    ></app-metric-card>
+
+    <app-metric-card
+      label="Job ingestione"
+      [value]="s.ingestion?.total_ingested ?? 0"
+      icon="cloud_sync"
+      helper="Backend"
+    ></app-metric-card>
+  </div>
+
+  <div class="analytics__grid">
+    <mat-card>
+      <mat-card-header>
+        <mat-card-title>Distribuzione tipi di query</mat-card-title>
+        <mat-card-subtitle>Basata sulla cronologia dell'applicazione</mat-card-subtitle>
+      </mat-card-header>
+
+      <mat-card-content>
+        <ng-container *ngIf="queryDistribution().length; else noQueries">
+          <ul class="analytics__distribution">
+            <li *ngFor="let item of queryDistribution(); trackBy: trackByType">
+              <div class="analytics__distribution-header">
+                <span class="analytics__chip">{{ item.type }}</span>
+                <span>{{ item.count }} occorrenze</span>
+              </div>
+              <mat-progress-bar [value]="item.percentage" mode="determinate"></mat-progress-bar>
+              <span class="analytics__distribution-value">{{ item.percentage }}%</span>
+            </li>
+          </ul>
+        </ng-container>
+
+        <ng-template #noQueries>
+          <p>Nessuna ricerca effettuata nella sessione corrente.</p>
+        </ng-template>
+      </mat-card-content>
+    </mat-card>
+
+    <mat-card>
+      <mat-card-header>
+        <mat-card-title>Configurazione sistema</mat-card-title>
+        <mat-card-subtitle>Parametri chiave di chunking e retrieval</mat-card-subtitle>
+      </mat-card-header>
+
+      <mat-card-content>
+        <table mat-table [dataSource]="configurationRows" class="analytics__table">
+          <ng-container matColumnDef="parameter">
+            <th mat-header-cell *matHeaderCellDef>Parametro</th>
+            <td mat-cell *matCellDef="let row">{{ row.parameter }}</td>
+          </ng-container>
+
+          <ng-container matColumnDef="value">
+            <th mat-header-cell *matHeaderCellDef>Valore</th>
+            <td mat-cell *matCellDef="let row">{{ row.value ?? 'N/D' }}</td>
+          </ng-container>
+
+          <tr mat-header-row *matHeaderRowDef="['parameter', 'value']"></tr>
+          <tr mat-row *matRowDef="let row; columns: ['parameter', 'value']"></tr>
+        </table>
+      </mat-card-content>
+    </mat-card>
+  </div>
+
+  <mat-progress-bar mode="indeterminate" *ngIf="isLoading()"></mat-progress-bar>
+</section>
+
+

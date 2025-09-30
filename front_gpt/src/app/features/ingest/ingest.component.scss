@@ -1,0 +1,52 @@
+.ingest {
+  display: block;
+
+  &__layout {
+    display: grid;
+    grid-template-columns: minmax(0, 3fr) minmax(280px, 1fr);
+    gap: 1.5rem;
+
+    @media (max-width: 1200px) {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  &__form {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+  }
+
+  &__field {
+    width: 100%;
+  }
+
+  &__actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.75rem;
+  }
+
+  &__sidebar {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+  }
+
+  &__metrics {
+    display: grid;
+    gap: 0.75rem;
+  }
+
+  &__history {
+    mat-nav-list {
+      max-height: 420px;
+      overflow: auto;
+    }
+
+    a {
+      white-space: normal;
+      word-break: break-all;
+    }
+  }
+}

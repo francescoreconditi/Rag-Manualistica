@@ -1,0 +1,46 @@
+.metric-card {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1.25rem 1.5rem;
+  border: none;
+  background: linear-gradient(135deg, #5c6bc0 0%, #3949ab 100%);
+  color: #ffffff;
+
+  &__icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.12);
+
+    mat-icon {
+      font-size: 28px;
+    }
+  }
+
+  &__content {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+  }
+
+  &__label {
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    opacity: 0.85;
+  }
+
+  &__value {
+    font-size: 1.75rem;
+    font-weight: 600;
+  }
+
+  &__helper {
+    font-size: 0.75rem;
+    opacity: 0.75;
+  }
+}
