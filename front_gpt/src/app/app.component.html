@@ -1,0 +1,62 @@
+<mat-sidenav-container class="layout">
+  <mat-sidenav
+    #drawer
+    class="layout__sidenav"
+    mode="side"
+    [opened]="sidenavOpened()"
+    [fixedInViewport]="false"
+  >
+    <div class="sidenav__header">
+      <div class="sidenav__branding">
+        <mat-icon color="primary">auto_stories</mat-icon>
+        <div class="sidenav__titles">
+          <span class="sidenav__title">{{ title }}</span>
+          <span class="sidenav__subtitle">Document Intelligence</span>
+        </div>
+      </div>
+      <button
+        mat-icon-button
+        type="button"
+        class="sidenav__toggle"
+        (click)="toggleSidenav()"
+        matTooltip="Comprimi menu"
+      >
+        <mat-icon>chevron_left</mat-icon>
+      </button>
+    </div>
+
+    <mat-nav-list>
+      <a
+        *ngFor="let item of navItems"
+        mat-list-item
+        [routerLink]="item.path"
+        routerLinkActive="sidenav__item--active"
+      >
+        <mat-icon matListItemIcon>{{ item.icon }}</mat-icon>
+        <span matListItemTitle>{{ item.label }}</span>
+        <span matListItemLine>{{ item.description }}</span>
+      </a>
+    </mat-nav-list>
+
+    <mat-divider></mat-divider>
+
+    <div class="sidenav__settings">
+      <app-api-settings></app-api-settings>
+    </div>
+  </mat-sidenav>
+
+  <mat-sidenav-content class="layout__content">
+    <mat-toolbar color="primary" class="toolbar">
+      <button mat-icon-button type="button" (click)="toggleSidenav()" class="toolbar__menu">
+        <mat-icon>menu</mat-icon>
+      </button>
+      <span class="toolbar__title">{{ title }}</span>
+      <span class="spacer"></span>
+      <app-api-settings appearance="toolbar"></app-api-settings>
+    </mat-toolbar>
+
+    <main class="layout__main">
+      <router-outlet></router-outlet>
+    </main>
+  </mat-sidenav-content>
+</mat-sidenav-container>

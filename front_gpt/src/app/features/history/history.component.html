@@ -1,0 +1,39 @@
+<section class="history">
+  <mat-card>
+    <mat-card-header>
+      <mat-card-title>Cronologia ricerche</mat-card-title>
+      <mat-card-subtitle>Le ultime domande inviate al sistema RAG</mat-card-subtitle>
+    </mat-card-header>
+
+    <mat-card-content *ngIf="history().length; else emptyState">
+      <mat-nav-list>
+        <a mat-list-item *ngFor="let entry of history()">
+          <mat-icon matListItemIcon>history</mat-icon>
+          <div matListItemTitle>{{ entry.query }}</div>
+          <div matListItemLine>{{ entry.timestamp | date: 'short' }}</div>
+          <div matListItemLine>Confidenza {{ entry.confidence | percent: '1.0-0' }} · {{ entry.queryType ?? 'general' }}</div>
+          <button mat-icon-button matTooltip="Copia query" type="button" (click)="copy(entry)" [disabled]="copying() === entry.query">
+            <mat-icon *ngIf="copying() !== entry.query">content_copy</mat-icon>
+            <mat-icon *ngIf="copying() === entry.query">done</mat-icon>
+          </button>
+        </a>
+      </mat-nav-list>
+
+      <mat-divider></mat-divider>
+
+      <div class="history__actions">
+        <button mat-stroked-button color="warn" type="button" (click)="clear()">
+          <mat-icon>delete_sweep</mat-icon>
+          Svuota cronologia
+        </button>
+      </div>
+    </mat-card-content>
+  </mat-card>
+
+  <ng-template #emptyState>
+    <div class="history__empty">
+      <mat-icon>history_toggle_off</mat-icon>
+      <p>Nessuna ricerca registrata. Avvia una ricerca per popolare la cronologia.</p>
+    </div>
+  </ng-template>
+</section>

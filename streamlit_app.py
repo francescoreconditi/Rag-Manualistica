@@ -6,6 +6,7 @@ Interface web completa per ingestione documenti e ricerca intelligente
 # Carica variabili d'ambiente dal file .env
 import os
 from pathlib import Path
+
 from dotenv import load_dotenv
 
 # Carica il file .env dalla root del progetto
@@ -25,14 +26,15 @@ def get_fresh_settings():
     return Settings()
 
 
-import streamlit as st
 import asyncio
 import json
 import time
 from datetime import datetime
-from typing import List, Dict, Any
-import pandas as pd
+from typing import Any, Dict, List
+
 import httpx
+import pandas as pd
+import streamlit as st
 
 # Configurazione pagina
 st.set_page_config(
@@ -121,7 +123,8 @@ async def check_api_health():
 async def ingest_urls(urls: List[str]):
     """Ingestione URLs nel sistema"""
     try:
-        async with httpx.AsyncClient(timeout=300.0) as client:  # 5 minuti per PC lenti
+        # Timeout aumentato per ingestione pesante (embedding + indicizzazione)
+        async with httpx.AsyncClient(timeout=300.0) as client:
             response = await client.post(f"{API_BASE_URL}/ingest", json={"urls": urls})
             return response.json()
     except Exception as e:
