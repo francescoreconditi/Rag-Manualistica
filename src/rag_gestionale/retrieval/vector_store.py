@@ -105,30 +105,39 @@ class VectorStore:
 
         logger.info(f"Indicizzazione di {len(chunks)} chunk")
 
-        # Genera embeddings in batch
-        texts = [chunk.content for chunk in chunks]
-        embeddings = await self._generate_embeddings_batch(texts)
+        try:
+            # Genera embeddings in batch
+            texts = [chunk.content for chunk in chunks]
+            logger.debug(f"Generazione embeddings per {len(texts)} testi")
+            embeddings = await self._generate_embeddings_batch(texts)
+            logger.debug(f"Embeddings generati: {len(embeddings)}")
 
-        # Prepara punti per Qdrant
-        points = []
-        for i, chunk in enumerate(chunks):
-            point = PointStruct(
-                id=abs(hash(chunk.metadata.id)),  # Usa hash positivo come ID numerico
-                vector=embeddings[i].tolist(),
-                payload=self._chunk_to_payload(chunk),
-            )
-            points.append(point)
+            # Prepara punti per Qdrant
+            points = []
+            for i, chunk in enumerate(chunks):
+                point = PointStruct(
+                    id=abs(hash(chunk.metadata.id)),  # Usa hash positivo come ID numerico
+                    vector=embeddings[i].tolist(),
+                    payload=self._chunk_to_payload(chunk),
+                )
+                points.append(point)
 
-        # Inserisci in batch
-        batch_size = 100
-        for i in range(0, len(points), batch_size):
-            batch = points[i : i + batch_size]
-            await self.async_client.upsert(
-                collection_name=self.collection_name,
-                points=batch,
-            )
+            logger.debug(f"Preparati {len(points)} punti per l'inserimento")
 
-        logger.info(f"Indicizzati {len(chunks)} chunk nel vector store")
+            # Inserisci in batch
+            batch_size = 100
+            for i in range(0, len(points), batch_size):
+                batch = points[i : i + batch_size]
+                logger.debug(f"Inserimento batch {i // batch_size + 1}: {len(batch)} punti")
+                await self.async_client.upsert(
+                    collection_name=self.collection_name,
+                    points=batch,
+                )
+
+            logger.info(f"Indicizzati {len(chunks)} chunk nel vector store")
+        except Exception as e:
+            logger.error(f"ERRORE durante indicizzazione nel vector store: {e}")
+            raise
 
     async def delete_chunks_by_url(self, source_url: str) -> int:
         """
@@ -279,6 +288,11 @@ class VectorStore:
 
     async def _generate_embeddings_batch(self, texts: List[str]) -> List:
         """Genera embeddings in batch per efficienza"""
+        import time
+
+        start = time.time()
+        logger.debug(f"Inizio generazione embeddings per {len(texts)} testi")
+
         # Esegui in thread pool per non bloccare async loop
         loop = asyncio.get_event_loop()
         embeddings = await loop.run_in_executor(
@@ -287,8 +301,12 @@ class VectorStore:
                 texts,
                 batch_size=self.settings.embedding.batch_size,
                 normalize_embeddings=self.settings.embedding.normalize_embeddings,
+                show_progress_bar=False,
             ),
         )
+
+        elapsed = time.time() - start
+        logger.debug(f"Embeddings generati in {elapsed:.2f}s")
         return embeddings
 
     async def _generate_embedding(self, text: str):

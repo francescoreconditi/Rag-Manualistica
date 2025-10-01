@@ -8,5 +8,5 @@ echo - Redis on port 6379 (optional)
 echo.
 echo You can start them with: docker-compose up -d
 echo.
-uvicorn src.rag_gestionale.api.main:app --reload --host 0.0.0.0 --port 8000
+uv run uvicorn src.rag_gestionale.api.main:app --reload --host 0.0.0.0 --port 8000
 pause

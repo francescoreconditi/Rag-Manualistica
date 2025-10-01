@@ -202,6 +202,7 @@ class Settings(BaseSettings):
             "cassiopea.centrosistemi.it",
             "docs.centrosistemi.it",
             "docs.example.com",
+            "10.1.1.1",  # Wiki interna
         ],
         description="Domini autorizzati per crawling",
     )

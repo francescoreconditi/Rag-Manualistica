@@ -121,7 +121,7 @@ async def check_api_health():
 async def ingest_urls(urls: List[str]):
     """Ingestione URLs nel sistema"""
     try:
-        async with httpx.AsyncClient(timeout=60.0) as client:
+        async with httpx.AsyncClient(timeout=300.0) as client:  # 5 minuti per PC lenti
             response = await client.post(f"{API_BASE_URL}/ingest", json={"urls": urls})
             return response.json()
     except Exception as e:

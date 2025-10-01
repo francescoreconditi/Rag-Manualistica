@@ -235,7 +235,7 @@ class ResponseGenerator:
 
         # Almeno un risultato con score decente
         top_score = results[0].score if results else 0.0
-        min_score = 0.3  # Soglia minima
+        min_score = 0.5  # Soglia minima aumentata per evitare documenti poco rilevanti
 
         return top_score >= min_score
 
@@ -247,13 +247,20 @@ class ResponseGenerator:
         seen_sections = set()
 
         for result in results:
-            # Filtra per score minimo
-            if result.score < 0.2:
+            # Filtra per score minimo - soglia più alta per evitare documenti non rilevanti
+            if result.score < 0.4:
                 continue
 
             # Evita troppi risultati dalla stessa sezione
             section_key = result.chunk.metadata.section_path
             if section_key in seen_sections:
+                continue
+
+            # Controllo gap: se c'è un gap troppo grande tra il primo e gli altri, scarta
+            if filtered and (filtered[0].score - result.score) > 0.35:
+                logger.debug(
+                    f"Risultato scartato per gap di score troppo elevato: {result.score:.3f} vs {filtered[0].score:.3f}"
+                )
                 continue
 
             seen_sections.add(section_key)
