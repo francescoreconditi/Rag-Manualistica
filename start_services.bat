@@ -29,16 +29,6 @@ if errorlevel 1 (
 )
 echo ✓ OpenSearch is ready!
 
-echo Checking Redis (port 6379)...
-:check_redis
-timeout /t 2 >nul
-netstat -an | findstr :6379 | findstr LISTENING >nul
-if errorlevel 1 (
-    echo Waiting for Redis...
-    goto check_redis
-)
-echo ✓ Redis is ready!
-
 echo.
 echo ========================================
 echo   All services are ready!

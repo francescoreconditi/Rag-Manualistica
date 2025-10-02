@@ -180,10 +180,6 @@ class Settings(BaseSettings):
         env_nested_delimiter="__",
     )
 
-    # Database e cache
-    redis_url: str = Field(default="redis://localhost:6379", description="URL Redis")
-    cache_ttl_seconds: int = Field(default=3600, description="TTL cache in secondi")
-
     # Logging
     log_level: str = Field(default="INFO", description="Livello di logging")
     log_format: str = Field(

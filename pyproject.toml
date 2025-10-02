@@ -40,8 +40,7 @@ dependencies = [
     "jinja2>=3.1.0",
     "rich>=13.7.0",
     "loguru>=0.7.0",
-    # Config e cache
-    "redis>=5.0.0",
+    # Config
     "python-dotenv>=1.0.0",
     "streamlit>=1.50.0",
     "scalar-fastapi>=1.4.3",

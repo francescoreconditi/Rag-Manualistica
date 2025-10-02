@@ -4,7 +4,6 @@ echo.
 echo Make sure Docker services are running:
 echo - Qdrant on port 6333
 echo - OpenSearch on port 9200
-echo - Redis on port 6379 (optional)
 echo.
 echo You can start them with: docker-compose up -d
 echo.

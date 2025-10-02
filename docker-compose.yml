@@ -34,16 +34,6 @@ services:
       - opensearch_data:/usr/share/opensearch/data
     restart: unless-stopped
 
-  # Redis for caching (optional)
-  redis:
-    image: redis:7.2-alpine
-    ports:
-      - "6379:6379"
-    volumes:
-      - redis_data:/data
-    restart: unless-stopped
-    command: redis-server --appendonly yes
-
   rag-api:
     build:
       context: .
@@ -53,14 +43,11 @@ services:
     environment:
       - RAG_VECTOR_STORE__HOST=qdrant
       - RAG_LEXICAL_SEARCH__HOST=opensearch
-      - RAG_REDIS_URL=redis://redis:6379
     depends_on:
       - qdrant
       - opensearch
-      - redis
     restart: unless-stopped
 
 volumes:
   qdrant_data:
   opensearch_data:
-  redis_data:

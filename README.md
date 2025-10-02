@@ -38,7 +38,6 @@ Sistema RAG (Retrieval Augmented Generation) specializzato per documentazione di
 ## 📋 Prerequisiti
 
 - Python 3.9+
-- Redis Server
 - Qdrant Vector Database
 - OpenSearch
 - OpenAI API Key (per funzionalità LLM)
@@ -68,10 +67,6 @@ uv pip install -r requirements.txt
 Copia `.env.example` in `.env` e configura:
 
 ```env
-# Database e cache
-RAG_REDIS_URL=redis://localhost:6379
-RAG_CACHE_TTL_SECONDS=3600
-
 # API
 RAG_API_HOST=0.0.0.0
 RAG_API_PORT=8000
@@ -105,9 +100,6 @@ docker-compose up -d
 
 #### Oppure manualmente:
 ```bash
-# Redis
-docker run -d -p 6379:6379 redis:alpine
-
 # Qdrant
 docker run -d -p 6333:6333 -p 6334:6334 \
   -v $(pwd)/qdrant_storage:/qdrant/storage \
@@ -305,7 +297,6 @@ pytest --cov=src/rag_gestionale --cov-report=html
 - **Retrieval Stats**: Precision, recall, latency
 - **Ingestion Stats**: Documenti processati, chunk creati
 - **LLM Usage**: Token utilizzati, costi stimati
-- **Cache Performance**: Hit rate, memoria utilizzata
 
 ### Logging
 Configurabile via `RAG_LOG_LEVEL`:
@@ -317,7 +308,6 @@ Configurabile via `RAG_LOG_LEVEL`:
 ## 🚀 Performance
 
 ### Ottimizzazioni implementate
-- **Caching Redis**: Risultati ricerca frequenti
 - **Batch Processing**: Embeddings e ingestione
 - **Async I/O**: Operazioni database parallele
 - **Connection Pooling**: Riuso connessioni DB

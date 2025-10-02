@@ -24,7 +24,7 @@ COPY src/ ./src/
 COPY .env ./
 
 # Install dependencies globally (no venv)
-RUN uv sync --all-extras
+RUN uv sync
 
 # Expose port
 EXPOSE 8000
