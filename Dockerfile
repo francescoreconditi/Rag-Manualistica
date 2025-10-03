@@ -13,18 +13,21 @@ RUN pip install uv
 # Set working directory
 WORKDIR /app
 
-# Create non-root user and change ownership
-RUN useradd --create-home --shell /bin/bash app && \
-    chown -R app:app /app
-USER app
-
-# Copy project files
+# Copy project files PRIMA di cambiare utente
 COPY pyproject.toml ./
 COPY src/ ./src/
 COPY .env ./
 
-# Install dependencies globally (no venv)
-RUN uv sync
+# Install dependencies globally (no venv) come ROOT
+# Usa PyTorch CPU-only per ridurre dimensione immagine e tempo di build
+RUN uv pip install --system --index-url https://download.pytorch.org/whl/cpu \
+    torch torchvision --no-cache-dir && \
+    uv sync
+
+# Create non-root user and change ownership DOPO l'installazione
+RUN useradd --create-home --shell /bin/bash app && \
+    chown -R app:app /app
+USER app
 
 # Expose port
 EXPOSE 8000
