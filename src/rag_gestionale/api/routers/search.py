@@ -6,6 +6,7 @@ import time
 from typing import Dict, Any, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
+from loguru import logger
 from pydantic import BaseModel, Field
 
 from ...core.models import RAGResponse, QueryType
@@ -43,15 +44,20 @@ async def search(
     start_time = time.time()
 
     try:
+        logger.info(f"Ricerca avviata per query: '{request.query}'")
+
         # Ricerca ibrida
+        logger.debug("Inizio ricerca ibrida...")
         search_results = await components.retriever.search(
             query=request.query,
             top_k=request.top_k,
             filters=request.filters,
         )
+        logger.info(f"Ricerca completata: {len(search_results)} risultati trovati")
 
         if not search_results:
             # Nessun risultato trovato
+            logger.warning("Nessun risultato trovato per la query")
             return RAGResponse(
                 query=request.query,
                 query_type=QueryType.GENERAL,
@@ -62,27 +68,33 @@ async def search(
             )
 
         # Classifica query per template appropriato
+        logger.debug("Classificazione query...")
         query_type = components.retriever.query_classifier.classify_query(request.query)
+        logger.info(f"Query classificata come: {query_type}")
 
         # Genera risposta con LLM (se configurato) o template
         processing_time_ms = int((time.time() - start_time) * 1000)
 
+        logger.info("Inizio generazione risposta...")
         response = await components.generator.generate_response(
             query=request.query,
             query_type=query_type,
             search_results=search_results,
             processing_time_ms=processing_time_ms,
         )
+        logger.info("Risposta generata con successo")
 
         # Filtra fonti se richiesto
         if not request.include_sources:
             response.sources = []
 
+        logger.info(f"Ricerca completata in {processing_time_ms}ms")
         return response
 
     except HTTPException:
         raise
     except Exception as e:
+        logger.error(f"Errore durante la ricerca: {e}", exc_info=True)
         raise HTTPException(
             status_code=500, detail=f"Errore durante la ricerca: {str(e)}"
         )

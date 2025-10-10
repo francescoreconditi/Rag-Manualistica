@@ -38,8 +38,10 @@ class PDFSection:
         self.page_start = page_start
         self.page_end = page_end
         self.bbox = bbox  # Bounding box (x0, y0, x1, y1)
-        self.content_type = self._classify_content()
+        # IMPORTANTE: error_codes deve essere inizializzato PRIMA di _classify_content()
+        # perché _classify_content() usa self.error_codes
         self.error_codes = extract_error_codes(content)
+        self.content_type = self._classify_content()
         self.tables: List[str] = []
         self.figures: List[Dict[str, str]] = []
 

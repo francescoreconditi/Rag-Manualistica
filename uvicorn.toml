@@ -1,0 +1,27 @@
+# Configurazione Uvicorn per evitare reload infiniti su Windows
+
+[uvicorn]
+host = "0.0.0.0"
+port = 8000
+reload = true
+log_level = "info"
+
+# Esclude directory che causano reload infiniti
+reload_excludes = [
+    ".venv/*",
+    ".venv/**/*",
+    "__pycache__/*",
+    "__pycache__/**/*",
+    "*.pyc",
+    ".git/*",
+    ".git/**/*",
+    "*.log",
+    "data/*",
+    "logs/*"
+]
+
+# Include solo il codice sorgente
+reload_includes = [
+    "src/**/*.py",
+    "*.py"
+]

@@ -4,6 +4,7 @@ Orchestrazione di crawling, parsing e preprocessing per scalabilità massiva.
 """
 
 import asyncio
+import tempfile
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
@@ -178,23 +179,30 @@ class IngestionCoordinator:
     ) -> List[DocumentChunk]:
         """Parse documento PDF da risultato crawling"""
         try:
-            # Salva PDF temporaneo
-            temp_file = f"/tmp/claude/{crawl_result.content_hash}.pdf"
-            Path(temp_file).parent.mkdir(parents=True, exist_ok=True)
+            # Crea directory temporanea cross-platform
+            temp_dir = Path(tempfile.gettempdir()) / "rag_gestionale_pdfs"
+            temp_dir.mkdir(parents=True, exist_ok=True)
+
+            # Salva PDF temporaneo con nome univoco
+            temp_file = temp_dir / f"{crawl_result.content_hash}.pdf"
+
+            logger.info(f"Salvando PDF temporaneo in: {temp_file}")
 
             with open(temp_file, "wb") as f:
                 # Riconverti da latin-1 a bytes
                 f.write(crawl_result.content.encode("latin-1"))
 
-            chunks = await self._parse_pdf_file(temp_file)
+            logger.info(f"PDF salvato, inizio parsing da {temp_file}")
+            chunks = await self._parse_pdf_file(str(temp_file))
+            logger.info(f"Parsing completato, ottenuti {len(chunks)} chunk dal PDF")
 
             # Cleanup
-            Path(temp_file).unlink(missing_ok=True)
+            temp_file.unlink(missing_ok=True)
 
             return chunks
 
         except Exception as e:
-            logger.error(f"Errore parsing PDF {crawl_result.url}: {e}")
+            logger.error(f"Errore parsing PDF {crawl_result.url}: {e}", exc_info=True)
             return []
 
     async def _parse_pdf_file(self, file_path: str) -> List[DocumentChunk]:

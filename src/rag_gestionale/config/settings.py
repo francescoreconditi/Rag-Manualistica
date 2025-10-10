@@ -199,6 +199,9 @@ class Settings(BaseSettings):
             "docs.centrosistemi.it",
             "docs.example.com",
             "10.1.1.1",  # Wiki interna
+            "192.168.0.12",  # Server PDF locale
+            "localhost",  # Sviluppo locale
+            "127.0.0.1",  # Sviluppo locale
         ],
         description="Domini autorizzati per crawling",
     )

@@ -20,20 +20,20 @@ def normalize_text(text: str) -> str:
         Testo normalizzato
     """
     # Rimuovi whitespace eccessivi
-    text = re.sub(r'\s+', ' ', text.strip())
+    text = re.sub(r"\s+", " ", text.strip())
 
     # Normalizza punteggiatura
-    text = re.sub(r'\.{2,}', '...', text)
+    text = re.sub(r"\.{2,}", "...", text)
 
     # Unifica forme alternative comuni
     replacements = {
-        'N°': 'Numero',
-        'n°': 'numero',
-        'N.': 'Numero',
-        'n.': 'numero',
-        'impostaz.': 'impostazione',
-        'config.': 'configurazione',
-        'parametr.': 'parametro',
+        "N°": "Numero",
+        "n°": "numero",
+        "N.": "Numero",
+        "n.": "numero",
+        "impostaz.": "impostazione",
+        "config.": "configurazione",
+        "parametr.": "parametro",
     }
 
     for old, new in replacements.items():
@@ -53,7 +53,7 @@ def compute_content_hash(content: str) -> str:
         Hash SHA-1 come stringa esadecimale
     """
     normalized = normalize_text(content)
-    return hashlib.sha1(normalized.encode('utf-8')).hexdigest()
+    return hashlib.sha1(normalized.encode("utf-8")).hexdigest()
 
 
 def extract_breadcrumbs(section_path: str) -> List[str]:
@@ -69,13 +69,13 @@ def extract_breadcrumbs(section_path: str) -> List[str]:
     if not section_path:
         return []
 
-    parts = section_path.split('/')
+    parts = section_path.split("/")
     # Capitalizza e normalizza
     breadcrumbs = []
     for part in parts:
         if part:
             # Capitalizza prima lettera di ogni parte
-            normalized = part.replace('_', ' ').replace('-', ' ')
+            normalized = part.replace("_", " ").replace("-", " ")
             breadcrumbs.append(normalized.title())
 
     return breadcrumbs
@@ -92,7 +92,7 @@ def extract_error_codes(text: str) -> List[str]:
         Lista di codici errore trovati
     """
     # Pattern per codici errore: 2-4 lettere seguite da numero
-    pattern = r'\b[A-Z]{2,4}-?\d{2,4}\b'
+    pattern = r"\b[A-Z]{2,4}-?\d{2,4}\b"
     return list(set(re.findall(pattern, text.upper())))
 
 
@@ -112,13 +112,30 @@ def is_valid_url(url: str, allowed_domains: List[str]) -> bool:
         if not parsed.scheme or not parsed.netloc:
             return False
 
+        # Estrae dominio/IP senza porta
         domain = parsed.netloc.lower()
+        if ":" in domain:
+            domain = domain.split(":")[0]
+
         # Rimuovi www. se presente
-        if domain.startswith('www.'):
+        if domain.startswith("www."):
             domain = domain[4:]
 
-        return any(domain == allowed or domain.endswith('.' + allowed)
-                  for allowed in allowed_domains)
+        # Verifica se è un IP locale (192.168.x.x, 10.x.x.x, 172.16-31.x.x, localhost, 127.x.x.x)
+        if (
+            domain == "localhost"
+            or domain.startswith("127.")
+            or domain.startswith("192.168.")
+            or domain.startswith("10.")
+            or any(domain.startswith(f"172.{i}.") for i in range(16, 32))
+        ):
+            return True
+
+        # Altrimenti verifica nella whitelist
+        return any(
+            domain == allowed or domain.endswith("." + allowed)
+            for allowed in allowed_domains
+        )
     except Exception:
         return False
 
@@ -134,16 +151,16 @@ def clean_html_tags(text: str) -> str:
         Testo pulito
     """
     # Rimuovi tag HTML
-    text = re.sub(r'<[^>]+>', '', text)
+    text = re.sub(r"<[^>]+>", "", text)
 
     # Decodifica entità HTML comuni
     html_entities = {
-        '&amp;': '&',
-        '&lt;': '<',
-        '&gt;': '>',
-        '&quot;': '"',
-        '&#39;': "'",
-        '&nbsp;': ' ',
+        "&amp;": "&",
+        "&lt;": "<",
+        "&gt;": ">",
+        "&quot;": '"',
+        "&#39;": "'",
+        "&nbsp;": " ",
     }
 
     for entity, char in html_entities.items():
@@ -164,9 +181,9 @@ def extract_ui_path_from_text(text: str) -> Optional[str]:
     """
     # Pattern comuni per percorsi UI
     patterns = [
-        r'Menu\s*>\s*(.+?)(?:\.|$)',
-        r'Vai\s+a\s*:\s*(.+?)(?:\.|$)',
-        r'Percorso\s*:\s*(.+?)(?:\.|$)',
+        r"Menu\s*>\s*(.+?)(?:\.|$)",
+        r"Vai\s+a\s*:\s*(.+?)(?:\.|$)",
+        r"Percorso\s*:\s*(.+?)(?:\.|$)",
         r'(?:Sezione|Menu)\s*"([^"]+)"',
     ]
 
@@ -175,7 +192,7 @@ def extract_ui_path_from_text(text: str) -> Optional[str]:
         if match:
             path = match.group(1).strip()
             # Pulisci e normalizza
-            path = re.sub(r'\s*>\s*', ' > ', path)
+            path = re.sub(r"\s*>\s*", " > ", path)
             return path
 
     return None
@@ -192,10 +209,10 @@ def split_into_sentences(text: str) -> List[str]:
         Lista di frasi
     """
     # Pattern per fine frase in italiano
-    sentence_endings = r'[.!?]+(?:\s|$)'
+    sentence_endings = r"[.!?]+(?:\s|$)"
 
     # Split mantenendo la punteggiatura
-    sentences = re.split(f'({sentence_endings})', text)
+    sentences = re.split(f"({sentence_endings})", text)
 
     # Ricomponi frasi con punteggiatura
     result = []
@@ -243,7 +260,7 @@ def truncate_to_tokens(text: str, max_tokens: int, chars_per_token: float = 4.0)
 
     # Tronca al carattere precedente uno spazio per evitare parole spezzate
     truncated = text[:max_chars]
-    last_space = truncated.rfind(' ')
+    last_space = truncated.rfind(" ")
     if last_space > max_chars * 0.8:  # Solo se non perdiamo troppo testo
         truncated = truncated[:last_space]
 
