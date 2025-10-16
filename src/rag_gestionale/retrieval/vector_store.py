@@ -23,7 +23,7 @@ from loguru import logger
 from sentence_transformers import SentenceTransformer
 
 from ..core.models import DocumentChunk, SearchResult
-from ..config.settings import get_settings
+from ..config.settings import get_settings, get_device
 
 
 class VectorStore:
@@ -51,19 +51,21 @@ class VectorStore:
             check_compatibility=False,
         )
 
-        # Modello embedding
+        # Determina device da utilizzare
+        device = get_device()
         logger.info(
-            f"Caricamento modello embedding: {self.settings.embedding.model_name}"
+            f"Caricamento modello embedding: {self.settings.embedding.model_name} su device={device}"
         )
+
         self.embedding_model = SentenceTransformer(
             self.settings.embedding.model_name,
-            device="cpu",  # Usa GPU se disponibile
+            device=device,
         )
 
         # Crea collection se non esiste
         await self._ensure_collection_exists()
 
-        logger.info("Vector store inizializzato")
+        logger.info(f"Vector store inizializzato (device={device})")
 
     async def _ensure_collection_exists(self):
         """Crea la collection se non esiste"""
@@ -310,17 +312,46 @@ class VectorStore:
         start = time.time()
         logger.debug(f"Inizio generazione embeddings per {len(texts)} testi")
 
+        # Determina batch size in base al device
+        device = self.embedding_model.device.type
+        batch_size = (
+            self.settings.embedding.batch_size_gpu
+            if device == "cuda"
+            else self.settings.embedding.batch_size
+        )
+
+        logger.debug(f"Batch size utilizzato: {batch_size} (device={device})")
+
         # Esegui in thread pool per non bloccare async loop
         loop = asyncio.get_event_loop()
-        embeddings = await loop.run_in_executor(
-            None,
-            lambda: self.embedding_model.encode(
-                texts,
-                batch_size=self.settings.embedding.batch_size,
-                normalize_embeddings=self.settings.embedding.normalize_embeddings,
-                show_progress_bar=False,
-            ),
-        )
+
+        try:
+            embeddings = await loop.run_in_executor(
+                None,
+                lambda: self.embedding_model.encode(
+                    texts,
+                    batch_size=batch_size,
+                    normalize_embeddings=self.settings.embedding.normalize_embeddings,
+                    show_progress_bar=False,
+                ),
+            )
+        except RuntimeError as e:
+            if "out of memory" in str(e).lower():
+                logger.warning(
+                    f"CUDA OOM durante generazione embeddings - riduco batch size da {batch_size} a {batch_size // 2}"
+                )
+                # Retry con batch size ridotto
+                embeddings = await loop.run_in_executor(
+                    None,
+                    lambda: self.embedding_model.encode(
+                        texts,
+                        batch_size=batch_size // 2,
+                        normalize_embeddings=self.settings.embedding.normalize_embeddings,
+                        show_progress_bar=False,
+                    ),
+                )
+            else:
+                raise
 
         elapsed = time.time() - start
         logger.debug(f"Embeddings generati in {elapsed:.2f}s")

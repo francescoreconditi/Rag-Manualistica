@@ -47,7 +47,8 @@ class EmbeddingSettings(BaseModel):
 
     model_name: str = Field(default="BAAI/bge-m3", description="Modello per embeddings")
     normalize_embeddings: bool = Field(default=True, description="Normalizzazione L2")
-    batch_size: int = Field(default=32, description="Batch size per embedding")
+    batch_size: int = Field(default=32, description="Batch size per embedding CPU")
+    batch_size_gpu: int = Field(default=128, description="Batch size per embedding GPU")
     max_length: int = Field(default=512, description="Lunghezza massima input")
 
 
@@ -207,6 +208,12 @@ class Settings(BaseSettings):
         env_nested_delimiter="__",
     )
 
+    # Device configuration
+    device_mode: str = Field(
+        default="auto",
+        description="Modalità device: 'auto' (usa GPU se disponibile), 'cuda' (forza GPU), 'cpu' (forza CPU)",
+    )
+
     # Logging
     log_level: str = Field(default="INFO", description="Livello di logging")
     log_format: str = Field(
@@ -252,3 +259,28 @@ settings = Settings()
 def get_settings() -> Settings:
     """Factory per ottenere le impostazioni"""
     return settings
+
+
+def get_device() -> str:
+    """
+    Determina il device da utilizzare basandosi sulla configurazione.
+
+    Returns:
+        str: "cuda" se GPU disponibile e abilitata, "cpu" altrimenti
+    """
+    device_mode = settings.device_mode.lower()
+
+    if device_mode == "cpu":
+        return "cpu"
+    elif device_mode == "cuda":
+        # Forza CUDA senza verificare disponibilità (lancerà errore se non disponibile)
+        return "cuda"
+    else:  # "auto" o qualsiasi altro valore
+        try:
+            import torch
+
+            if torch.cuda.is_available():
+                return "cuda"
+        except ImportError:
+            pass
+        return "cpu"

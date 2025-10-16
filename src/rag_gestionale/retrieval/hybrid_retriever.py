@@ -11,7 +11,7 @@ from loguru import logger
 from sentence_transformers import CrossEncoder
 
 from ..core.models import DocumentChunk, SearchResult, QueryType
-from ..config.settings import get_settings
+from ..config.settings import get_settings, get_device
 from .vector_store import VectorStore
 from .lexical_search import LexicalSearch
 
@@ -86,15 +86,24 @@ class HybridRetriever:
         await self.vector_store.initialize()
         await self.lexical_search.initialize()
 
+        # Determina device da utilizzare
+        device = get_device()
+        logger.info(
+            f"Caricamento reranker: {self.settings.retrieval.reranker_model} su device={device}"
+        )
+
         # Carica reranker
-        logger.info(f"Caricamento reranker: {self.settings.retrieval.reranker_model}")
         loop = asyncio.get_event_loop()
         self.reranker = await loop.run_in_executor(
             None,
-            lambda: CrossEncoder(self.settings.retrieval.reranker_model),
+            lambda: CrossEncoder(
+                self.settings.retrieval.reranker_model,
+                max_length=512,
+                device=device,
+            ),
         )
 
-        logger.info("Hybrid retriever inizializzato")
+        logger.info(f"Hybrid retriever inizializzato (device={device})")
 
     async def search(
         self,
