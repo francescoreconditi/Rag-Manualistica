@@ -3,7 +3,7 @@
     <mat-expansion-panel *ngFor="let source of sources; index as index">
       <mat-expansion-panel-header>
         <mat-panel-title>
-          Fonte {{ index + 1 }} · {{ source.chunk.metadata.title }}
+          Fonte {{ index + 1 }} ï¿½ {{ source.chunk.metadata.title }}
         </mat-panel-title>
         <mat-panel-description>
           Score: {{ source.score | number: '1.3-3' }}
@@ -44,8 +44,29 @@
         </div>
       </div>
 
+      <!-- Immagini associate -->
+      <div class="source-list__images" *ngIf="source.images && source.images.length > 0">
+        <h4>Immagini associate ({{ source.images.length }})</h4>
+        <div class="source-list__images-grid">
+          <div *ngFor="let image of source.images" class="source-list__image-card">
+            <img
+              [src]="getImageUrl(image.image_url)"
+              [alt]="image.caption || 'Immagine dalla documentazione'"
+              [title]="image.width + 'x' + image.height + ' - ' + image.format.toUpperCase()"
+              loading="lazy"
+            />
+            <div class="source-list__image-info">
+              <mat-icon>photo</mat-icon>
+              <span>{{ image.width }}x{{ image.height }} â€¢ {{ image.format.toUpperCase() }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <mat-divider *ngIf="source.images && source.images.length > 0"></mat-divider>
+
       <div class="source-list__content">
-        <h4>Estratto</h4>
+        <h4>Estratto contenuto testuale</h4>
         <p>{{ source.chunk.content }}</p>
       </div>
     </mat-expansion-panel>

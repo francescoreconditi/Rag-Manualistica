@@ -67,7 +67,7 @@
 
             <div class="search__llm-grid" *ngIf="searchForm.value.llmEnabled">
               <mat-form-field appearance="outline">
-                <mat-label>Modalità generazione</mat-label>
+                <mat-label>Modalitï¿½ generazione</mat-label>
                 <mat-select formControlName="generationMode">
                   <mat-option *ngFor="let mode of generationModes" [value]="mode">
                     {{ mode }}
@@ -78,7 +78,7 @@
               <mat-form-field appearance="outline">
                 <mat-label>OpenAI API Key (opzionale)</mat-label>
                 <input matInput type="password" formControlName="apiKey" placeholder="sk-..." />
-                <mat-hint>Se configurata lato server non è necessario inserirla.</mat-hint>
+                <mat-hint>Se configurata lato server non ï¿½ necessario inserirla.</mat-hint>
               </mat-form-field>
             </div>
           </div>
@@ -105,7 +105,7 @@
         <mat-card-header>
           <mat-card-title>Stato Sistema</mat-card-title>
           <mat-card-subtitle *ngIf="health() as state">
-            {{ state.status | uppercase }} · v{{ state.version }}
+            {{ state.status | uppercase }} ï¿½ v{{ state.version }}
           </mat-card-subtitle>
         </mat-card-header>
 
@@ -156,7 +156,7 @@
               <mat-icon>history</mat-icon>
               <div>
                 <p>{{ entry.query }}</p>
-                <span>{{ entry.timestamp | date: 'HH:mm:ss' }} · confidenza {{ entry.confidence | percent:'1.0-0' }}</span>
+                <span>{{ entry.timestamp | date: 'HH:mm:ss' }} ï¿½ confidenza {{ entry.confidence | percent:'1.0-0' }}</span>
               </div>
             </li>
           </ul>
@@ -169,13 +169,15 @@
     <mat-card-header>
       <mat-card-title>Risposta</mat-card-title>
       <mat-card-subtitle>
-        Tipo: {{ result.query_type }} · Confidenza: {{ result.confidence | percent:'1.0-0' }}
-        <span *ngIf="searchDurationMs() as duration"> · Tempo: {{ duration / 1000 | number:'1.2-2' }}s</span>
+        Tipo: {{ result.query_type }} ï¿½ Confidenza: {{ result.confidence | percent:'1.0-0' }}
+        <span *ngIf="searchDurationMs() as duration"> ï¿½ Tempo: {{ duration / 1000 | number:'1.2-2' }}s</span>
       </mat-card-subtitle>
     </mat-card-header>
 
     <mat-card-content>
-      <div class="search__answer" [innerHTML]="result.answer"></div>
+      <div class="search__answer">
+        <markdown [data]="result.answer"></markdown>
+      </div>
 
       <mat-divider></mat-divider>
 

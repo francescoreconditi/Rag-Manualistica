@@ -13,6 +13,7 @@ import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { MatSelectModule } from '@angular/material/select';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatTooltipModule } from '@angular/material/tooltip';
+import { MarkdownModule } from 'ngx-markdown';
 
 import { NotificationService } from '../../core/services/notification.service';
 import { RagApiService } from '../../core/services/rag-api.service';
@@ -44,6 +45,7 @@ import { SourceListComponent } from '../../shared/components/source-list/source-
     MatProgressBarModule,
     MatSlideToggleModule,
     MatTooltipModule,
+    MarkdownModule,
     MetricCardComponent,
     SourceListComponent
   ],
