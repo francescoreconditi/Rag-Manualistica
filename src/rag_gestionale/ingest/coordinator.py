@@ -11,12 +11,19 @@ from typing import Dict, List, Optional, Tuple
 
 from loguru import logger
 
-from ..core.models import DocumentChunk, ChunkMetadata, ContentType, SourceFormat
+from ..core.models import (
+    DocumentChunk,
+    ChunkMetadata,
+    ContentType,
+    SourceFormat,
+    ImageMetadata,
+)
 from ..core.utils import compute_content_hash, extract_breadcrumbs
 from ..config.settings import get_settings
 from .crawler import WebCrawler, CrawlResult
 from .html_parser import HTMLParser, HTMLSection
 from .pdf_parser import PDFParser, PDFSection
+from .image_service import ImageService
 
 
 class IngestionCoordinator:
@@ -27,6 +34,14 @@ class IngestionCoordinator:
         self.html_parser = HTMLParser()
         self.pdf_parser = PDFParser()
         self.processed_hashes: set = set()
+
+        # ImageService per estrazione immagini
+        if self.settings.image_storage.enabled:
+            self.image_service = ImageService(
+                storage_base_path=self.settings.image_storage.storage_base_path
+            )
+        else:
+            self.image_service = None
 
     async def ingest_from_urls(self, urls: List[str]) -> List[DocumentChunk]:
         """
@@ -134,16 +149,92 @@ class IngestionCoordinator:
     async def _parse_html_document(
         self, crawl_result: CrawlResult
     ) -> List[DocumentChunk]:
-        """Parse documento HTML da risultato crawling"""
+        """Parse documento HTML da risultato crawling con estrazione immagini"""
         try:
             sections, metadata = self.html_parser.parse_from_url(
                 crawl_result.url, crawl_result.content
             )
 
+            # Estrai immagini se abilitato
+            images_metadata = []
+            if self.image_service:
+                logger.info(f"ImageService attivo, inizio estrazione immagini da HTML")
+                try:
+                    # Raccogli tutte le figure da tutte le sezioni
+                    all_figures = []
+                    for section in sections:
+                        if hasattr(section, "figures") and section.figures:
+                            all_figures.extend(section.figures)
+                            logger.debug(
+                                f"Sezione '{section.title}' ha {len(section.figures)} figure"
+                            )
+
+                    logger.info(
+                        f"Raccolte {len(all_figures)} figure totali dalle sezioni"
+                    )
+
+                    if all_figures:
+                        logger.info(
+                            f"Inizio download di {len(all_figures)} immagini..."
+                        )
+                        images_metadata = (
+                            await self.image_service.download_and_save_html_images(
+                                all_figures, metadata["source_url"]
+                            )
+                        )
+                        logger.info(
+                            f"Scaricate {len(images_metadata)} immagini da HTML {crawl_result.url}"
+                        )
+                    else:
+                        logger.warning(
+                            f"Nessuna figura trovata nell'HTML {crawl_result.url}"
+                        )
+                except Exception as e:
+                    logger.error(
+                        f"Errore estrazione immagini da HTML: {e}", exc_info=True
+                    )
+
+            # Crea chunk dalle sezioni
             chunks = []
+            figure_index = 0
             for section in sections:
                 chunk = self._create_chunk_from_html_section(section, metadata)
                 if chunk:
+                    # Associa immagini al chunk
+                    if images_metadata and hasattr(section, "figures"):
+                        num_figures = len(section.figures)
+                        section_images = images_metadata[
+                            figure_index : figure_index + num_figures
+                        ]
+
+                        if section_images:
+                            chunk.metadata.image_ids = [
+                                img.id for img in section_images
+                            ]
+
+                            # Aggiorna chunk_id nelle immagini
+                            for img in section_images:
+                                img.chunk_id = chunk.metadata.id
+
+                            # Arricchisci contenuto con testo OCR
+                            ocr_texts = [
+                                img.ocr_text for img in section_images if img.ocr_text
+                            ]
+                            if ocr_texts:
+                                chunk.content += (
+                                    "\n\n[Testo estratto dalle immagini]\n"
+                                    + "\n---\n".join(ocr_texts)
+                                )
+                                logger.debug(
+                                    f"Arricchito chunk con {len(ocr_texts)} testi OCR"
+                                )
+
+                            logger.debug(
+                                f"Associati {len(section_images)} immagini al chunk {chunk.metadata.id}"
+                            )
+
+                        figure_index += num_figures
+
                     chunks.append(chunk)
 
             return chunks
@@ -206,14 +297,72 @@ class IngestionCoordinator:
             return []
 
     async def _parse_pdf_file(self, file_path: str) -> List[DocumentChunk]:
-        """Parse file PDF"""
+        """Parse file PDF con estrazione immagini"""
         try:
             sections, metadata = self.pdf_parser.parse_from_path(file_path)
 
+            # Estrai immagini se abilitato
+            images_metadata = []
+            if self.image_service:
+                try:
+                    import fitz
+
+                    doc = fitz.open(file_path)
+                    images_metadata = (
+                        await self.image_service.extract_and_save_pdf_images(
+                            doc, metadata["source_url"]
+                        )
+                    )
+                    doc.close()
+                    logger.info(
+                        f"Estratte {len(images_metadata)} immagini da PDF {file_path}"
+                    )
+                except Exception as e:
+                    logger.error(f"Errore estrazione immagini da PDF: {e}")
+
+            # Crea chunk dalle sezioni
             chunks = []
             for section in sections:
                 chunk = self._create_chunk_from_pdf_section(section, metadata)
                 if chunk:
+                    # Associa immagini al chunk in base al range di pagine
+                    if images_metadata:
+                        section_images = [
+                            img
+                            for img in images_metadata
+                            if img.page_number
+                            and section.page_start
+                            <= img.page_number
+                            <= section.page_end
+                        ]
+
+                        if section_images:
+                            # Aggiorna image_ids nel chunk
+                            chunk.metadata.image_ids = [
+                                img.id for img in section_images
+                            ]
+
+                            # Aggiorna chunk_id nelle immagini
+                            for img in section_images:
+                                img.chunk_id = chunk.metadata.id
+
+                            # Arricchisci contenuto con testo OCR
+                            ocr_texts = [
+                                img.ocr_text for img in section_images if img.ocr_text
+                            ]
+                            if ocr_texts:
+                                chunk.content += (
+                                    "\n\n[Testo estratto dalle immagini]\n"
+                                    + "\n---\n".join(ocr_texts)
+                                )
+                                logger.debug(
+                                    f"Arricchito chunk con {len(ocr_texts)} testi OCR"
+                                )
+
+                            logger.debug(
+                                f"Associati {len(section_images)} immagini al chunk {chunk.metadata.id}"
+                            )
+
                     chunks.append(chunk)
 
             return chunks

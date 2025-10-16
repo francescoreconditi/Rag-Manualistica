@@ -55,6 +55,12 @@ class ResponseGenerator:
         """
         start_time = time.time()
 
+        # Log immagini in input
+        total_images_input = sum(len(r.images) for r in search_results)
+        logger.info(
+            f"Generator ricevuto: {len(search_results)} risultati con {total_images_input} immagini totali"
+        )
+
         # Controllo qualità risultati
         if not search_results or not self._has_sufficient_context(search_results):
             return self._generate_fallback_response(
@@ -88,6 +94,12 @@ class ResponseGenerator:
                 )
 
             generation_time = int((time.time() - start_time) * 1000)
+
+            # Log immagini in output
+            total_images_output = sum(len(r.images) for r in quality_results)
+            logger.info(
+                f"Generator output: {len(quality_results)} fonti con {total_images_output} immagini totali"
+            )
 
             return RAGResponse(
                 query=query,
@@ -246,9 +258,19 @@ class ResponseGenerator:
         filtered = []
         seen_sections = set()
 
-        for result in results:
-            # Filtra per score minimo - soglia più alta per evitare documenti non rilevanti
-            if result.score < 0.4:
+        for idx, result in enumerate(results):
+            logger.debug(
+                f"Filtraggio risultato {idx + 1}: score={result.score:.3f}, immagini={len(result.images)}"
+            )
+
+            # IMPORTANTE: non scartare mai risultati con immagini, anche se hanno score basso
+            has_images = len(result.images) > 0
+
+            # Filtra per score minimo - ma solo se non ha immagini
+            if result.score < 0.4 and not has_images:
+                logger.debug(
+                    f"  → Risultato {idx + 1} SCARTATO per score basso e nessuna immagine"
+                )
                 continue
 
             # Evita troppi risultati dalla stessa sezione
@@ -257,19 +279,28 @@ class ResponseGenerator:
                 continue
 
             # Controllo gap: se c'è un gap troppo grande tra il primo e gli altri, scarta
-            if filtered and (filtered[0].score - result.score) > 0.35:
+            # MA: non scartare mai se ha immagini
+            if (
+                filtered
+                and (filtered[0].score - result.score) > 0.35
+                and not has_images
+            ):
                 logger.debug(
-                    f"Risultato scartato per gap di score troppo elevato: {result.score:.3f} vs {filtered[0].score:.3f}"
+                    f"  → Risultato {idx + 1} SCARTATO per gap di score: {result.score:.3f} vs {filtered[0].score:.3f}"
                 )
                 continue
 
             seen_sections.add(section_key)
             filtered.append(result)
+            logger.debug(f"  → Risultato {idx + 1} ACCETTATO")
 
             # Limita numero di risultati
             if len(filtered) >= self.settings.generation.max_context_chunks:
                 break
 
+        logger.info(
+            f"Filtro qualità: {len(results)} → {len(filtered)} risultati, immagini: {sum(len(r.images) for r in results)} → {sum(len(r.images) for r in filtered)}"
+        )
         return filtered
 
     def _calculate_confidence(

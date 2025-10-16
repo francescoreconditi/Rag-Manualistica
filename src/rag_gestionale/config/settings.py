@@ -143,6 +143,33 @@ class GenerationSettings(BaseModel):
     )
 
 
+class ImageStorageSettings(BaseModel):
+    """Configurazione per storage immagini"""
+
+    storage_base_path: str = Field(
+        default="./storage/images", description="Percorso base storage immagini"
+    )
+    min_width: int = Field(default=50, description="Larghezza minima immagini (px)")
+    min_height: int = Field(default=50, description="Altezza minima immagini (px)")
+    max_file_size_mb: int = Field(
+        default=10, description="Dimensione massima file (MB)"
+    )
+    enabled: bool = Field(default=True, description="Abilita estrazione immagini")
+
+    # OCR
+    ocr_enabled: bool = Field(default=True, description="Abilita OCR su immagini")
+    ocr_languages: str = Field(
+        default="ita+eng", description="Lingue OCR (formato Tesseract)"
+    )
+    ocr_min_confidence: int = Field(
+        default=30, description="Confidenza minima OCR (0-100)"
+    )
+    ocr_preprocessing: bool = Field(
+        default=True, description="Abilita pre-processing immagini per OCR"
+    )
+    ocr_timeout_seconds: int = Field(default=30, description="Timeout OCR per immagine")
+
+
 class IngestSettings(BaseModel):
     """Configurazione per l'ingestione"""
 
@@ -215,6 +242,7 @@ class Settings(BaseSettings):
     llm: LLMSettings = Field(default_factory=LLMSettings)
     generation: GenerationSettings = Field(default_factory=GenerationSettings)
     ingest: IngestSettings = Field(default_factory=IngestSettings)
+    image_storage: ImageStorageSettings = Field(default_factory=ImageStorageSettings)
 
 
 # Istanza globale delle impostazioni

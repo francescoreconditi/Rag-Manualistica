@@ -164,13 +164,17 @@ ISTRUZIONI FONDAMENTALI:
 2. Usa SOLO le informazioni fornite nel contesto
 3. NON inventare parametri, codici o procedure non presenti nelle fonti
 4. Struttura la risposta in modo chiaro e professionale
-5. Includi SEMPRE le citazioni delle fonti alla fine
+5. **IMPORTANTE**: Quando citi un'informazione, indica la fonte INLINE usando (Fonte N) dove N è il numero della fonte
 
 FORMATO RISPOSTA:
 - Introduzione breve al problema/parametro
-- Spiegazione dettagliata basata sulle fonti
+- Spiegazione dettagliata basata sulle fonti con citazioni inline (Fonte N)
 - Eventuali passi procedurali numerati
-- Sezione "Fonti:" con elenco delle fonti citate"""
+- NON aggiungere una sezione "Fonti:" separata alla fine (le fonti sono già mostrate nell'interfaccia)
+
+ESEMPIO DI CITAZIONE INLINE:
+"Il rateo è una quota di costo già maturato (Fonte 1). I ratei attivi misurano ricavi di competenza (Fonte 2)."
+"""
 
         # Prompt specifici per tipo
         type_specific = {
@@ -247,7 +251,8 @@ URL: {result.chunk.metadata.source_url}
 DOMANDA UTENTE:
 {query}
 
-Genera una risposta dettagliata e professionale basata esclusivamente sul contesto fornito."""
+Genera una risposta dettagliata e professionale basata esclusivamente sul contesto fornito.
+RICORDA: Cita le fonti inline usando (Fonte N) dopo ogni informazione. Non aggiungere una sezione "Fonti:" alla fine."""
 
     def _check_rate_limit(self) -> bool:
         """Controlla rate limit (richieste per minuto)"""

@@ -390,6 +390,17 @@ class HTMLParser:
                             )
 
                     else:
+                        # Cerca immagini dentro questo elemento (per MediaWiki con <div class="thumb">)
+                        if hasattr(next_element, "find_all"):
+                            imgs_in_element = next_element.find_all("img")
+                            for img_tag in imgs_in_element:
+                                figure_data = self._extract_figure(img_tag, base_url)
+                                if figure_data:
+                                    current_section.figures.append(figure_data)
+                                    content_elements.append(
+                                        f"[Figura: {figure_data['caption']}]"
+                                    )
+
                         text = clean_html_tags(next_element.get_text()).strip()
                         if text:
                             content_elements.append(text)

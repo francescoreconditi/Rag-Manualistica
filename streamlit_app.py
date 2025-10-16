@@ -13,10 +13,6 @@ from dotenv import load_dotenv
 env_path = Path(__file__).parent / ".env"
 load_dotenv(env_path)
 
-# Verifica caricamento del file .env
-if not env_path.exists():
-    st.error(f"File .env non trovato in: {env_path}")
-
 # IMPORTANTE: importa settings DOPO aver caricato .env
 from src.rag_gestionale.config.settings import Settings
 
@@ -139,7 +135,8 @@ async def search_rag(
 ):
     """Ricerca nel sistema RAG"""
     try:
-        async with httpx.AsyncClient(timeout=30.0) as client:
+        # Timeout aumentato a 600s (10 minuti) per gestire LLM e processing immagini
+        async with httpx.AsyncClient(timeout=600.0) as client:
             payload = {
                 "query": query,
                 "filters": filters or {},
@@ -155,9 +152,19 @@ async def search_rag(
                 f"{API_BASE_URL}/search",
                 json=payload,
             )
+
+            # Log del response per debugging
+            if response.status_code != 200:
+                error_detail = f"Status {response.status_code}: {response.text[:500]}"
+                return {"error": error_detail}
+
             return response.json()
+    except httpx.TimeoutException as e:
+        return {"error": f"Timeout dopo 10 minuti: {str(e)}"}
+    except httpx.HTTPError as e:
+        return {"error": f"Errore HTTP: {str(e)}"}
     except Exception as e:
-        return {"error": str(e)}
+        return {"error": f"Errore inatteso ({type(e).__name__}): {str(e)}"}
 
 
 async def get_system_stats():
@@ -405,8 +412,16 @@ def main():
                             chunk_data = source.get("chunk", {})
                             metadata = chunk_data.get("metadata", {})
 
+                            # Conta immagini per questa fonte
+                            source_images = source.get("images", [])
+                            img_count_text = (
+                                f" • {len(source_images)} immagini"
+                                if source_images
+                                else ""
+                            )
+
                             with st.expander(
-                                f"Fonte {idx}: {metadata.get('title', 'N/A')} (Score: {source.get('score', 0):.3f})"
+                                f"Fonte {idx}: {metadata.get('title', 'N/A')} (Score: {source.get('score', 0):.3f}){img_count_text}"
                             ):
                                 col1, col2 = st.columns([3, 1])
 
@@ -426,12 +441,57 @@ def main():
                                         "Rilevanza", f"{source.get('score', 0):.3f}"
                                     )
 
+                                # Mostra immagini prima del testo (se presenti)
+                                if source_images:
+                                    st.divider()
+                                    st.markdown(
+                                        f"**🖼️ Immagini associate** ({len(source_images)})"
+                                    )
+
+                                    # Crea colonne per mostrare immagini in griglia
+                                    num_images = len(source_images)
+                                    cols_per_row = 2
+                                    num_rows = (
+                                        num_images + cols_per_row - 1
+                                    ) // cols_per_row
+
+                                    for row_idx in range(num_rows):
+                                        cols = st.columns(cols_per_row)
+                                        for col_idx in range(cols_per_row):
+                                            img_idx = row_idx * cols_per_row + col_idx
+                                            if img_idx < num_images:
+                                                img_data = source_images[img_idx]
+                                                with cols[col_idx]:
+                                                    # URL immagine dal backend
+                                                    img_url = img_data.get(
+                                                        "image_url", ""
+                                                    )
+                                                    if img_url:
+                                                        # Costruisci URL completo
+                                                        full_img_url = (
+                                                            f"{API_BASE_URL}{img_url}"
+                                                        )
+                                                        try:
+                                                            st.image(
+                                                                full_img_url,
+                                                                use_container_width=True,
+                                                            )
+                                                            # Info sotto l'immagine
+                                                            st.caption(
+                                                                f"📐 {img_data.get('width', 0)}x{img_data.get('height', 0)} • "
+                                                                f"{img_data.get('format', 'N/A').upper()}"
+                                                            )
+                                                        except Exception as e:
+                                                            st.warning(
+                                                                f"Errore: {str(e)[:50]}"
+                                                            )
+
                                 st.divider()
 
                                 # Mostra estratto del contenuto
                                 content = chunk_data.get("content", "")[:500] + "..."
                                 st.text_area(
-                                    "Estratto",
+                                    "Estratto contenuto testuale",
                                     content,
                                     height=150,
                                     disabled=True,

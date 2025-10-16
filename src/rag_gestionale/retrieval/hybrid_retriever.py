@@ -132,6 +132,12 @@ class HybridRetriever:
         # Combina e deduplica risultati
         combined_results = self._combine_results(vector_results, lexical_results)
 
+        # Log immagini dopo combinazione
+        total_images = sum(len(r.images) for r in combined_results)
+        logger.info(
+            f"Dopo combinazione: {len(combined_results)} risultati con {total_images} immagini totali"
+        )
+
         # Reranking
         if len(combined_results) > self.settings.retrieval.k_final:
             reranked_results = await self._rerank_results(query, combined_results)
@@ -142,7 +148,15 @@ class HybridRetriever:
         diversified_results = self._diversify_results(reranked_results)
 
         # Tronca ai risultati finali
-        return diversified_results[:top_k]
+        final_results = diversified_results[:top_k]
+
+        # Log immagini finali
+        total_images_final = sum(len(r.images) for r in final_results)
+        logger.info(
+            f"Risultati finali: {len(final_results)} risultati con {total_images_final} immagini totali"
+        )
+
+        return final_results
 
     async def _get_candidates(
         self,
@@ -252,6 +266,13 @@ class HybridRetriever:
                 )
                 existing_result.score = combined_score
                 existing_result.explanation = f"Hybrid: {combined_score:.3f}"
+
+                # Combina immagini (merge deduplicato per ID)
+                existing_image_ids = {img.get("id") for img in existing_result.images}
+                for img in result.images:
+                    if img.get("id") not in existing_image_ids:
+                        existing_result.images.append(img)
+                        existing_image_ids.add(img.get("id"))
             else:
                 result.score = normalized_score
                 result.explanation = f"Lexical: {normalized_score:.3f}"

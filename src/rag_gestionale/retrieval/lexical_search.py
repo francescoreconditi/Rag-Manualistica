@@ -238,14 +238,29 @@ class LexicalSearch:
                 size=top_k,
             )
 
-            # Converte risultati
+            # Converte risultati e popola immagini
             results = []
             for hit in response["hits"]["hits"]:
                 chunk = self._document_to_chunk(hit["_source"])
+
+                # Popola immagini se presenti
+                images_data = []
+                if chunk.metadata.image_ids:
+                    logger.info(
+                        f"Chunk {chunk.metadata.id} ha {len(chunk.metadata.image_ids)} image_ids, caricamento metadata..."
+                    )
+                    images_data = await self._load_images_metadata(
+                        chunk.metadata.image_ids
+                    )
+                    logger.info(
+                        f"Caricate {len(images_data)} immagini per chunk {chunk.metadata.id}"
+                    )
+
                 result = SearchResult(
                     chunk=chunk,
                     score=hit["_score"],
                     explanation=f"BM25 score: {hit['_score']:.3f}",
+                    images=images_data,
                 )
                 results.append(result)
 
@@ -359,6 +374,7 @@ class LexicalSearch:
             "source_url": metadata.source_url,
             "lang": metadata.lang,
             "updated_at": metadata.updated_at.isoformat(),
+            "image_ids": metadata.image_ids or [],
         }
 
     def _document_to_chunk(self, doc: Dict[str, Any]) -> DocumentChunk:
@@ -385,12 +401,107 @@ class LexicalSearch:
             lang=doc["lang"],
             hash="",  # Non necessario per search
             updated_at=datetime.fromisoformat(doc["updated_at"]),
+            image_ids=doc.get("image_ids", []),
         )
 
         return DocumentChunk(
             content=doc["content"],
             metadata=metadata,
         )
+
+    async def _load_images_metadata(self, image_ids: List[str]) -> List[Dict[str, Any]]:
+        """
+        Carica metadata delle immagini partendo dagli ID
+
+        Args:
+            image_ids: Lista di ID immagini (formato: {source_hash}_img_{idx} o {source_hash}_p{page}_i{idx})
+
+        Returns:
+            Lista di dizionari con metadata immagini
+        """
+        from pathlib import Path
+        from PIL import Image
+
+        images_data = []
+
+        if not self.settings.image_storage.enabled:
+            return images_data
+
+        storage_base = Path(self.settings.image_storage.storage_base_path)
+
+        for image_id in image_ids:
+            try:
+                # Estrai source_hash e filename dall'ID
+                # Formato HTML: {source_hash}_img_{idx} -> file: img_{idx}.{ext}
+                # Formato PDF: {source_hash}_p{page}_i{idx} -> file: page_{page}_img_{idx}.{ext}
+                parts = image_id.split("_", 1)
+                if len(parts) < 2:
+                    logger.debug(f"Formato ID immagine non valido: {image_id}")
+                    continue
+
+                source_hash = parts[0]
+                remaining = parts[1]
+
+                # Determina il pattern del filename
+                if remaining.startswith("img_"):
+                    # Formato HTML: img_{idx}
+                    idx = remaining.split("_")[1]
+                    filename_pattern = f"img_{idx}"
+                elif remaining.startswith("p") and "_i" in remaining:
+                    # Formato PDF: p{page}_i{idx} -> page_{page}_img_{idx}
+                    page_part, idx_part = remaining.split("_i", 1)
+                    page_num = page_part[1:]  # Rimuove 'p'
+                    filename_pattern = f"page_{int(page_num) + 1}_img_{idx_part}"
+                else:
+                    logger.debug(f"Formato ID immagine non riconosciuto: {image_id}")
+                    continue
+
+                # Cerca il file nella directory source_hash
+                source_dir = storage_base / source_hash
+                if not source_dir.exists() or not source_dir.is_dir():
+                    logger.debug(
+                        f"Directory {source_hash} non trovata per immagine {image_id}"
+                    )
+                    continue
+
+                # Cerca file con questo pattern (diversi formati possibili)
+                found = False
+                for ext in ["png", "jpg", "jpeg", "gif", "webp"]:
+                    image_file = source_dir / f"{filename_pattern}.{ext}"
+                    if image_file.exists():
+                        # Ricostruisci metadata base dall'immagine
+                        try:
+                            with Image.open(image_file) as img:
+                                width, height = img.size
+                                format_name = img.format.lower() if img.format else ext
+
+                            image_data = {
+                                "id": image_id,
+                                "storage_path": str(image_file),
+                                "image_url": f"/images/{source_dir.name}/{image_file.name}",
+                                "width": width,
+                                "height": height,
+                                "format": format_name,
+                                "file_size_bytes": image_file.stat().st_size,
+                            }
+                            images_data.append(image_data)
+                            found = True
+                            break
+                        except Exception as img_err:
+                            logger.warning(
+                                f"Errore lettura immagine {image_file}: {img_err}"
+                            )
+
+                if not found:
+                    logger.debug(
+                        f"Immagine {image_id} non trovata nel filesystem (pattern: {filename_pattern})"
+                    )
+
+            except Exception as e:
+                logger.warning(f"Errore caricamento metadata immagine {image_id}: {e}")
+                continue
+
+        return images_data
 
     def _build_search_query(
         self,

@@ -12,7 +12,7 @@ from scalar_fastapi import get_scalar_api_reference
 
 from ..config.settings import get_settings
 from .dependencies import rag_components
-from .routers import search, ingest, chunks, health
+from .routers import search, ingest, chunks, health, images
 
 
 @asynccontextmanager
@@ -49,6 +49,7 @@ app.include_router(search.router)
 app.include_router(ingest.router)
 app.include_router(chunks.router)
 app.include_router(health.router)
+app.include_router(images.router)
 
 
 @app.get("/", response_class=HTMLResponse)
