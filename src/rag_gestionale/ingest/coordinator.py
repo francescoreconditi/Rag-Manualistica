@@ -149,55 +149,131 @@ class IngestionCoordinator:
     async def _parse_html_document(
         self, crawl_result: CrawlResult
     ) -> List[DocumentChunk]:
-        """Parse documento HTML da risultato crawling con estrazione immagini"""
+        """
+        Parse documento HTML da risultato crawling con estrazione immagini.
+        Supporta streaming batch processing per documenti grandi.
+        """
         try:
             sections, metadata = self.html_parser.parse_from_url(
                 crawl_result.url, crawl_result.content
             )
 
-            # Estrai immagini se abilitato
-            images_metadata = []
-            if self.image_service:
-                logger.info(f"ImageService attivo, inizio estrazione immagini da HTML")
-                try:
-                    # Raccogli tutte le figure da tutte le sezioni
-                    all_figures = []
-                    for section in sections:
-                        if hasattr(section, "figures") and section.figures:
-                            all_figures.extend(section.figures)
-                            logger.debug(
-                                f"Sezione '{section.title}' ha {len(section.figures)} figure"
-                            )
+            logger.info(f"Estratte {len(sections)} sezioni da {crawl_result.url}")
 
-                    logger.info(
-                        f"Raccolte {len(all_figures)} figure totali dalle sezioni"
-                    )
+            # Verifica se usare streaming batch processing
+            use_streaming = (
+                self.settings.ingest.enable_streaming_ingest
+                and len(sections) > self.settings.ingest.sections_batch_size
+            )
 
-                    if all_figures:
-                        logger.info(
-                            f"Inizio download di {len(all_figures)} immagini..."
-                        )
-                        images_metadata = (
-                            await self.image_service.download_and_save_html_images(
-                                all_figures, metadata["source_url"]
-                            )
-                        )
-                        logger.info(
-                            f"Scaricate {len(images_metadata)} immagini da HTML {crawl_result.url}"
-                        )
-                    else:
-                        logger.warning(
-                            f"Nessuna figura trovata nell'HTML {crawl_result.url}"
-                        )
-                except Exception as e:
-                    logger.error(
-                        f"Errore estrazione immagini da HTML: {e}", exc_info=True
-                    )
+            if use_streaming:
+                logger.info(
+                    f"Documento grande ({len(sections)} sezioni), uso streaming batch processing"
+                )
+                # Estrai immagini una volta per tutte (se abilitato)
+                images_metadata = await self._extract_images_from_sections(
+                    sections, metadata
+                )
 
-            # Crea chunk dalle sezioni
-            chunks = []
-            figure_index = 0
+                # Processa sezioni in batch
+                all_chunks = await self._process_sections_in_batches(
+                    sections, metadata, images_metadata
+                )
+                return all_chunks
+            else:
+                # Modalità standard per documenti piccoli
+                logger.info(
+                    f"Documento piccolo ({len(sections)} sezioni), processing standard"
+                )
+                return await self._process_sections_standard(sections, metadata)
+
+        except Exception as e:
+            logger.error(f"Errore parsing HTML {crawl_result.url}: {e}", exc_info=True)
+            return []
+
+    async def _extract_images_from_sections(
+        self, sections: List, metadata: Dict
+    ) -> List:
+        """Estrae immagini da tutte le sezioni"""
+        images_metadata = []
+        if not self.image_service:
+            return images_metadata
+
+        logger.info(f"ImageService attivo, inizio estrazione immagini da HTML")
+        try:
+            # Raccogli tutte le figure da tutte le sezioni
+            all_figures = []
             for section in sections:
+                if hasattr(section, "figures") and section.figures:
+                    all_figures.extend(section.figures)
+
+            logger.info(f"Raccolte {len(all_figures)} figure totali dalle sezioni")
+
+            if all_figures:
+                images_metadata = (
+                    await self.image_service.download_and_save_html_images(
+                        all_figures, metadata["source_url"]
+                    )
+                )
+                logger.info(f"Scaricate {len(images_metadata)} immagini da HTML")
+        except Exception as e:
+            logger.error(f"Errore estrazione immagini da HTML: {e}", exc_info=True)
+
+        return images_metadata
+
+    async def _process_sections_standard(
+        self, sections: List, metadata: Dict
+    ) -> List[DocumentChunk]:
+        """Processa sezioni in modalità standard (tutto in memoria)"""
+        images_metadata = await self._extract_images_from_sections(sections, metadata)
+
+        chunks = []
+        figure_index = 0
+
+        for section in sections:
+            chunk = self._create_chunk_from_html_section(section, metadata)
+            if chunk:
+                # Associa immagini al chunk
+                if images_metadata and hasattr(section, "figures"):
+                    num_figures = len(section.figures)
+                    section_images = images_metadata[
+                        figure_index : figure_index + num_figures
+                    ]
+                    self._associate_images_to_chunk(chunk, section_images)
+                    figure_index += num_figures
+
+                chunks.append(chunk)
+
+        return chunks
+
+    async def _process_sections_in_batches(
+        self, sections: List, metadata: Dict, images_metadata: List
+    ) -> List[DocumentChunk]:
+        """
+        Processa sezioni in batch per ridurre uso memoria.
+        Ogni batch viene processato e può essere indicizzato separatamente.
+        """
+        batch_size = self.settings.ingest.sections_batch_size
+        total_sections = len(sections)
+        all_chunks = []
+        figure_index = 0
+
+        logger.info(
+            f"Inizio processing in batch: {total_sections} sezioni, batch_size={batch_size}"
+        )
+
+        # Dividi sezioni in batch
+        for batch_start in range(0, total_sections, batch_size):
+            batch_end = min(batch_start + batch_size, total_sections)
+            batch_sections = sections[batch_start:batch_end]
+
+            logger.info(
+                f"Processing batch {batch_start // batch_size + 1}/{(total_sections + batch_size - 1) // batch_size}: sezioni {batch_start}-{batch_end}"
+            )
+
+            batch_chunks = []
+
+            for section in batch_sections:
                 chunk = self._create_chunk_from_html_section(section, metadata)
                 if chunk:
                     # Associa immagini al chunk
@@ -206,42 +282,42 @@ class IngestionCoordinator:
                         section_images = images_metadata[
                             figure_index : figure_index + num_figures
                         ]
-
-                        if section_images:
-                            chunk.metadata.image_ids = [
-                                img.id for img in section_images
-                            ]
-
-                            # Aggiorna chunk_id nelle immagini
-                            for img in section_images:
-                                img.chunk_id = chunk.metadata.id
-
-                            # Arricchisci contenuto con testo OCR
-                            ocr_texts = [
-                                img.ocr_text for img in section_images if img.ocr_text
-                            ]
-                            if ocr_texts:
-                                chunk.content += (
-                                    "\n\n[Testo estratto dalle immagini]\n"
-                                    + "\n---\n".join(ocr_texts)
-                                )
-                                logger.debug(
-                                    f"Arricchito chunk con {len(ocr_texts)} testi OCR"
-                                )
-
-                            logger.debug(
-                                f"Associati {len(section_images)} immagini al chunk {chunk.metadata.id}"
-                            )
-
+                        self._associate_images_to_chunk(chunk, section_images)
                         figure_index += num_figures
 
-                    chunks.append(chunk)
+                    batch_chunks.append(chunk)
 
-            return chunks
+            all_chunks.extend(batch_chunks)
+            logger.info(
+                f"Batch completato: {len(batch_chunks)} chunk creati, totale: {len(all_chunks)}"
+            )
 
-        except Exception as e:
-            logger.error(f"Errore parsing HTML {crawl_result.url}: {e}")
-            return []
+            # Piccola pausa per permettere al GC di liberare memoria
+            await asyncio.sleep(0.01)
+
+        logger.info(
+            f"Processing in batch completato: {len(all_chunks)} chunk totali da {total_sections} sezioni"
+        )
+        return all_chunks
+
+    def _associate_images_to_chunk(self, chunk: DocumentChunk, section_images: List):
+        """Associa immagini a un chunk e arricchisce con testo OCR"""
+        if not section_images:
+            return
+
+        chunk.metadata.image_ids = [img.id for img in section_images]
+
+        # Aggiorna chunk_id nelle immagini
+        for img in section_images:
+            img.chunk_id = chunk.metadata.id
+
+        # Arricchisci contenuto con testo OCR
+        ocr_texts = [img.ocr_text for img in section_images if img.ocr_text]
+        if ocr_texts:
+            chunk.content += "\n\n[Testo estratto dalle immagini]\n" + "\n---\n".join(
+                ocr_texts
+            )
+            logger.debug(f"Arricchito chunk con {len(ocr_texts)} testi OCR")
 
     async def _parse_html_file(self, file_path: str) -> List[DocumentChunk]:
         """Parse file HTML locale"""

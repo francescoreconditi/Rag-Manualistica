@@ -119,10 +119,12 @@ async def check_api_health():
 async def ingest_urls(urls: List[str]):
     """Ingestione URLs nel sistema"""
     try:
-        # Timeout aumentato per ingestione pesante (embedding + indicizzazione)
-        async with httpx.AsyncClient(timeout=300.0) as client:
+        # Timeout aumentato a 30 minuti per ingestione di pagine HTML grosse
+        async with httpx.AsyncClient(timeout=1800.0) as client:
             response = await client.post(f"{API_BASE_URL}/ingest", json={"urls": urls})
             return response.json()
+    except httpx.TimeoutException as e:
+        return {"status": "error", "message": f"Timeout dopo 30 minuti: {str(e)}"}
     except Exception as e:
         return {"status": "error", "message": str(e)}
 

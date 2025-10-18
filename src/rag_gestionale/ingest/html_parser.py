@@ -131,9 +131,15 @@ class HTMLParser:
     """Parser HTML per manuali di gestionali"""
 
     def __init__(self):
+        from ..config.settings import get_settings
+
+        self.settings = get_settings()
+
         # Configurazione trafilatura per contenuto tecnico
         self.config = use_config()
-        self.config.set("DEFAULT", "EXTRACTION_TIMEOUT", "30")
+        # Timeout aumentato per CPU
+        timeout_str = str(self.settings.ingest.parsing_timeout_seconds)
+        self.config.set("DEFAULT", "EXTRACTION_TIMEOUT", timeout_str)
         self.config.set("DEFAULT", "MIN_EXTRACTED_SIZE", "100")
 
         # Selettori da rimuovere (navigazione, cookie, etc.)
@@ -196,6 +202,9 @@ class HTMLParser:
             # Fallback semplice senza BeautifulSoup
             return self._simple_parse(url, html_content)
 
+        # Pre-processing: controlla dimensione e tronca se necessario
+        html_content = self._preprocess_html(html_content)
+
         # Parse completo con BeautifulSoup
         try:
             # Estrazione con trafilatura per contenuto pulito
@@ -209,7 +218,7 @@ class HTMLParser:
             # Parse dettagliato con BeautifulSoup
             soup = BeautifulSoup(html_content, "html.parser")
 
-            # Rimuovi elementi indesiderati
+            # Rimuovi elementi indesiderati (versione più aggressiva)
             self._clean_soup(soup)
 
             # Estrai metadati generali
@@ -266,9 +275,91 @@ class HTMLParser:
 
         return [section], metadata
 
+    def _preprocess_html(self, html_content: str) -> str:
+        """
+        Pre-processa HTML per ridurre dimensione e rimuovere contenuti non necessari
+
+        Args:
+            html_content: Contenuto HTML grezzo
+
+        Returns:
+            HTML pre-processato
+        """
+        from loguru import logger
+
+        original_size = len(html_content)
+        max_size = self.settings.ingest.max_html_size_chars
+
+        # Se supera il limite, tronca
+        if original_size > max_size:
+            logger.warning(
+                f"HTML troppo grande ({original_size} chars), troncamento a {max_size} chars"
+            )
+            html_content = html_content[:max_size]
+
+        # Rimuovi commenti HTML
+        html_content = re.sub(r"<!--.*?-->", "", html_content, flags=re.DOTALL)
+
+        # Rimuovi script e style inline (prima del parsing BeautifulSoup)
+        html_content = re.sub(
+            r"<script[^>]*>.*?</script>",
+            "",
+            html_content,
+            flags=re.DOTALL | re.IGNORECASE,
+        )
+        html_content = re.sub(
+            r"<style[^>]*>.*?</style>",
+            "",
+            html_content,
+            flags=re.DOTALL | re.IGNORECASE,
+        )
+
+        # Rimuovi SVG grandi
+        html_content = re.sub(
+            r"<svg[^>]*>.*?</svg>", "", html_content, flags=re.DOTALL | re.IGNORECASE
+        )
+
+        # Rimuovi iframe
+        html_content = re.sub(
+            r"<iframe[^>]*>.*?</iframe>",
+            "",
+            html_content,
+            flags=re.DOTALL | re.IGNORECASE,
+        )
+
+        new_size = len(html_content)
+        if new_size < original_size:
+            logger.debug(
+                f"Pre-processing HTML: {original_size} -> {new_size} chars ({100 * (original_size - new_size) / original_size:.1f}% riduzione)"
+            )
+
+        return html_content
+
     def _clean_soup(self, soup) -> None:
-        """Pulisce il soup rimuovendo elementi indesiderati"""
+        """Pulisce il soup rimuovendo elementi indesiderati (versione più aggressiva)"""
+        # Rimuovi selettori standard
         for selector in self.remove_selectors:
+            for element in soup.select(selector):
+                element.decompose()
+
+        # Rimuovi elementi aggiuntivi per ridurre dimensione
+        additional_remove = [
+            "iframe",
+            "object",
+            "embed",
+            "video",
+            "audio",
+            "canvas",
+            "svg",
+            "noscript",
+            "form",  # Form generalmente non contengono documentazione
+            ".social",
+            ".share",
+            ".comments",
+            ".comment",
+        ]
+
+        for selector in additional_remove:
             for element in soup.select(selector):
                 element.decompose()
 
@@ -282,6 +373,44 @@ class HTMLParser:
             if hasattr(tag, "attrs"):
                 keep_attrs = ["id", "class", "href", "src", "alt", "title"]
                 tag.attrs = {k: v for k, v in tag.attrs.items() if k in keep_attrs}
+
+    def _should_skip_section(self, section: HTMLSection) -> bool:
+        """
+        Determina se una sezione deve essere skippata (troppo piccola o inutile)
+
+        Args:
+            section: Sezione da valutare
+
+        Returns:
+            True se la sezione deve essere skippata
+        """
+        # Salta sezioni troppo corte
+        if len(section.content) < self.settings.ingest.min_content_length:
+            return True
+
+        # Salta sezioni con solo whitespace
+        if not section.content.strip():
+            return True
+
+        # Salta sezioni con titoli generici inutili
+        skip_titles = [
+            "menu",
+            "navigation",
+            "header",
+            "footer",
+            "sidebar",
+            "cookie",
+            "privacy",
+            "copyright",
+            "condividi",
+            "share",
+        ]
+
+        title_lower = section.title.lower()
+        if any(skip in title_lower for skip in skip_titles):
+            return True
+
+        return False
 
     def _extract_metadata(self, soup: BeautifulSoup, url: str) -> Dict:
         """Estrae metadati dal documento"""
@@ -417,9 +546,8 @@ class HTMLParser:
         if current_section:
             sections.append(current_section)
 
-        return [
-            s for s in sections if len(s.content) > 50
-        ]  # Filtra sezioni troppo corte
+        # Filtra sezioni usando la nuova logica
+        return [s for s in sections if not self._should_skip_section(s)]
 
     def _extract_table(self, table_element: Tag) -> str:
         """Estrae contenuto tabella in formato Markdown"""
@@ -453,7 +581,7 @@ class HTMLParser:
     def _extract_figure(
         self, figure_element: Tag, base_url: str
     ) -> Optional[Dict[str, str]]:
-        """Estrae dati figure/immagini"""
+        """Estrae dati figure/immagini con filtri per escludere icone e sprite"""
         result = {"src": "", "alt": "", "caption": "", "type": "image"}
 
         # Trova img
@@ -466,6 +594,53 @@ class HTMLParser:
         if img:
             src = img.get("src", "")
             if src:
+                # Filtro 1: Escludi immagini comuni da ignorare
+                skip_patterns = [
+                    "/sprite",
+                    "/icon",
+                    "/button",
+                    "/arrow",
+                    "/pixel",
+                    "1x1",
+                    "transparent.gif",
+                    "spacer.gif",
+                    "/ui/",
+                    "/chrome/",
+                    "data:image",  # Data URI
+                ]
+
+                src_lower = src.lower()
+                if any(pattern in src_lower for pattern in skip_patterns):
+                    return None
+
+                # Filtro 2: Verifica dimensioni dell'immagine (width/height attributes)
+                width = img.get("width")
+                height = img.get("height")
+
+                try:
+                    if width and height:
+                        w = (
+                            int(width)
+                            if isinstance(width, str) and width.isdigit()
+                            else int(width)
+                            if isinstance(width, int)
+                            else 0
+                        )
+                        h = (
+                            int(height)
+                            if isinstance(height, str) and height.isdigit()
+                            else int(height)
+                            if isinstance(height, int)
+                            else 0
+                        )
+
+                        # Salta immagini troppo piccole (icone, sprite)
+                        min_size = self.settings.image_storage.min_width
+                        if w > 0 and h > 0 and (w < min_size or h < min_size):
+                            return None
+                except (ValueError, TypeError):
+                    pass  # Se non riusciamo a parsare, continuiamo
+
                 result["src"] = (
                     urljoin(base_url, src) if not src.startswith("http") else src
                 )
@@ -481,7 +656,11 @@ class HTMLParser:
         else:
             result["caption"] = "Immagine senza descrizione"
 
-        return result if result["src"] or result["caption"] else None
+        # Non restituire immagini senza src valido
+        if not result["src"]:
+            return None
+
+        return result
 
     def _generate_anchor(self, title: str) -> str:
         """Genera anchor dal titolo"""

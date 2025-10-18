@@ -47,7 +47,9 @@ class EmbeddingSettings(BaseModel):
 
     model_name: str = Field(default="BAAI/bge-m3", description="Modello per embeddings")
     normalize_embeddings: bool = Field(default=True, description="Normalizzazione L2")
-    batch_size: int = Field(default=32, description="Batch size per embedding CPU")
+    batch_size: int = Field(
+        default=8, description="Batch size per embedding CPU (ridotto per stabilità)"
+    )
     batch_size_gpu: int = Field(default=128, description="Batch size per embedding GPU")
     max_length: int = Field(default=512, description="Lunghezza massima input")
 
@@ -150,12 +152,21 @@ class ImageStorageSettings(BaseModel):
     storage_base_path: str = Field(
         default="./storage/images", description="Percorso base storage immagini"
     )
-    min_width: int = Field(default=50, description="Larghezza minima immagini (px)")
-    min_height: int = Field(default=50, description="Altezza minima immagini (px)")
+    min_width: int = Field(
+        default=100,
+        description="Larghezza minima immagini (px) - aumentato per escludere icone",
+    )
+    min_height: int = Field(
+        default=100,
+        description="Altezza minima immagini (px) - aumentato per escludere icone",
+    )
     max_file_size_mb: int = Field(
         default=10, description="Dimensione massima file (MB)"
     )
-    enabled: bool = Field(default=True, description="Abilita estrazione immagini")
+    enabled: bool = Field(
+        default=False,
+        description="Abilita estrazione immagini (DISABILITATO temporaneamente per concentrarsi sul testo)",
+    )
 
     # OCR
     ocr_enabled: bool = Field(default=True, description="Abilita OCR su immagini")
@@ -189,6 +200,23 @@ class IngestSettings(BaseModel):
     )
     similarity_threshold: float = Field(
         default=0.92, description="Soglia per deduplicazione"
+    )
+    max_html_size_chars: int = Field(
+        default=500000, description="Dimensione massima HTML in caratteri (500K)"
+    )
+    parsing_timeout_seconds: int = Field(
+        default=120, description="Timeout parsing HTML/PDF in secondi"
+    )
+    embedding_timeout_seconds: int = Field(
+        default=300, description="Timeout generazione embeddings in secondi"
+    )
+
+    # Batch processing per grandi documenti
+    sections_batch_size: int = Field(
+        default=15, description="Numero di sezioni da processare per batch"
+    )
+    enable_streaming_ingest: bool = Field(
+        default=True, description="Abilita ingestione streaming per grandi file"
     )
 
     # Formati supportati
