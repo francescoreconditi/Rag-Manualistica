@@ -1,0 +1,53 @@
+# Pre-commit hooks configuration
+# See https://pre-commit.com for more information
+
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-added-large-files
+        args: ['--maxkb=1000']
+      - id: check-json
+      - id: check-toml
+      - id: check-merge-conflict
+      - id: detect-private-key
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.6.0
+    hooks:
+      # Linter
+      - id: ruff
+        args: [--fix, --exit-non-zero-on-fix]
+      # Formatter
+      - id: ruff-format
+
+  - repo: local
+    hooks:
+      # Run quick unit tests before commit
+      - id: pytest-quick
+        name: pytest-quick
+        entry: uv run pytest
+        args: [tests/, -m, "unit and not slow", --tb=short, -x, --no-cov]
+        language: system
+        pass_filenames: false
+        always_run: false
+        stages: [pre-commit]
+
+      # Type checking con mypy (opzionale)
+      - id: mypy
+        name: mypy
+        entry: uv run mypy
+        args: [src/rag_gestionale, --ignore-missing-imports]
+        language: system
+        types: [python]
+        pass_filenames: false
+        always_run: false
+        stages: [pre-push]
+
+# Configurazione per eseguire manualmente hook specifici:
+# pre-commit run --all-files                    # Tutti gli hook
+# pre-commit run ruff --all-files               # Solo ruff
+# pre-commit run pytest-quick --all-files       # Solo test rapidi

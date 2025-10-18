@@ -1,0 +1,3 @@
+"""
+Performance e benchmark tests
+"""

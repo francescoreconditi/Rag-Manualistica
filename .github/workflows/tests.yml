@@ -1,0 +1,57 @@
+name: Tests
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  test:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        python-version: ["3.11", "3.12"]
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Install uv
+      uses: astral-sh/setup-uv@v5
+
+    - name: Install dependencies
+      run: |
+        uv pip install -e ".[dev]"
+
+    - name: Lint with ruff
+      run: |
+        uv run ruff check src/
+        uv run ruff format --check src/
+
+    - name: Run unit tests
+      run: |
+        uv run pytest tests/ -m "unit" --cov=src/rag_gestionale --cov-report=xml --cov-report=term
+
+    - name: Run integration tests
+      run: |
+        uv run pytest tests/ -m "integration" --cov=src/rag_gestionale --cov-report=xml --cov-append
+      continue-on-error: true  # Integration tests potrebbero fallire senza servizi esterni
+
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v4
+      with:
+        file: ./coverage.xml
+        flags: unittests
+        name: codecov-${{ matrix.os }}-py${{ matrix.python-version }}
+        fail_ci_if_error: false
+
+    - name: Check coverage threshold
+      run: |
+        uv run pytest tests/ -m "unit" --cov=src/rag_gestionale --cov-fail-under=80 --cov-report=term
